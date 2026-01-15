@@ -1,0 +1,7 @@
+
+# build artifacts
+/devrouter
+web/node_modules/
+internal/devrouter/web/dist/*
+!internal/devrouter/web/dist/.keep
+.jules/
