@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -14,7 +15,12 @@ import (
 	"devrouter/internal/devrouter"
 )
 
-const version = "0.1.0"
+// Build-time variables (injected via ldflags)
+var (
+	version   = "dev"
+	commit    = "unknown"
+	buildDate = "unknown"
+)
 
 func main() {
 	os.Exit(run())
@@ -31,7 +37,10 @@ func run() int {
 		usage()
 		return 0
 	case "-v", "--version", "version":
-		fmt.Println(version)
+		fmt.Printf("devrouter %s\n", version)
+		fmt.Printf("  commit:  %s\n", commit)
+		fmt.Printf("  built:   %s\n", buildDate)
+		fmt.Printf("  go:      %s\n", runtime.Version())
 		return 0
 	case "up":
 		return runUp(os.Args[2:])
