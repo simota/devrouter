@@ -17,8 +17,8 @@ A local development router that eliminates port conflicts without modifying your
 ## Quick Start
 
 ```bash
-# Install
-go install github.com/simota/devrouter/cmd/devrouter@latest
+# Install (download binary from GitHub Releases or build from source)
+# See Installation section below
 
 # Start the global Traefik proxy
 devrouter daemon up
@@ -39,25 +39,51 @@ devrouter down /path/to/your/monorepo
 - macOS / Linux
 - Docker (Docker Desktop or Colima)
 - `docker` CLI with `docker compose`
-- Go 1.20+ (for building from source)
+
+### Build Requirements (for building from source)
+
+- Go 1.20+
+- Node.js 18+
+- pnpm (`npm install -g pnpm`)
 
 ## Installation
 
-### From Source
+### Download Binary (Recommended)
+
+Download the latest binary from [GitHub Releases](https://github.com/simota/devrouter/releases):
 
 ```bash
-go install github.com/simota/devrouter/cmd/devrouter@latest
+# macOS (Apple Silicon)
+curl -L https://github.com/simota/devrouter/releases/latest/download/devrouter_darwin_arm64.tar.gz | tar xz
+sudo mv devrouter /usr/local/bin/
+
+# macOS (Intel)
+curl -L https://github.com/simota/devrouter/releases/latest/download/devrouter_darwin_amd64.tar.gz | tar xz
+sudo mv devrouter /usr/local/bin/
+
+# Linux (amd64)
+curl -L https://github.com/simota/devrouter/releases/latest/download/devrouter_linux_amd64.tar.gz | tar xz
+sudo mv devrouter /usr/local/bin/
 ```
 
-### Build Locally
+### Build from Source
+
+> **Note**: `go install github.com/simota/devrouter/cmd/devrouter@latest` does not work because the Web UI frontend assets need to be built first and embedded into the binary.
 
 ```bash
 git clone https://github.com/simota/devrouter.git
 cd devrouter
-go build -o devrouter ./cmd/devrouter
+make build
+sudo mv devrouter /usr/local/bin/
 ```
 
-The binary is placed in `$GOBIN` (or `$GOPATH/bin` if `GOBIN` is not set). Ensure it's in your `PATH`.
+Or install directly to `$GOPATH/bin`:
+
+```bash
+make install
+```
+
+Ensure `/usr/local/bin` or `$GOPATH/bin` is in your `PATH`.
 
 ## CLI Commands
 
