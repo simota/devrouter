@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="ja" class="lang-jp">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DevRouter — Compose のままで、衝突を消す。</title>
+    <meta name="description" content="DevRouter はモノレポの port 衝突を、アプリ無改造で解決するローカル開発ルーターです。Traefik と Host ベース URL により、複数の monorepo を並列起動できます。" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="DevRouter — Compose のままで、衝突を消す。" />
+    <meta property="og:description" content="モノレポの port 衝突を、アプリ無改造で解決するローカル開発ルーター。" />
+    <meta property="og:url" content="https://simota.github.io/devrouter/" />
+    <meta property="og:image" content="https://simota.github.io/devrouter/og-image.svg" />
+    <meta property="og:site_name" content="DevRouter" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="DevRouter — Compose as-is. Conflicts gone." />
+    <meta name="twitter:description" content="Production-like order for localhost — without touching a single line of your app." />
+    <meta name="twitter:image" content="https://simota.github.io/devrouter/og-image.svg" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="style.css" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0a0e14" />
+  </head>
+  <body>
+    <!-- ============== Header ============== -->
+    <header class="site-header">
+      <div class="container nav">
+        <a href="#top" class="nav-logo" aria-label="DevRouter home">
+          <span class="logo-icon">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 6h16M4 12h16M4 18h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              <circle cx="18" cy="18" r="3" fill="currentColor" class="pulse" />
+            </svg>
+          </span>
+          <span class="nav-logo-text">DevRouter</span>
+          <span class="nav-version">v0.1</span>
+        </a>
+        <nav class="nav-links" aria-label="Primary">
+          <a class="nav-link" href="#how-it-works"><span lang="jp">仕組み</span><span lang="en">How</span></a>
+          <a class="nav-link" href="#features"><span lang="jp">機能</span><span lang="en">Features</span></a>
+          <a class="nav-link" href="#quickstart"><span lang="jp">開始</span><span lang="en">Quickstart</span></a>
+          <a class="nav-link always-visible" href="https://github.com/simota/devrouter" target="_blank" rel="noopener" aria-label="GitHub repository">GitHub</a>
+          <div class="lang-toggle" role="group" aria-label="Language">
+            <button type="button" data-lang-btn="jp" class="active" aria-pressed="true">JP</button>
+            <button type="button" data-lang-btn="en" aria-pressed="false">EN</button>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main id="top">
+      <!-- ============== Hero ============== -->
+      <section class="hero" aria-label="Hero">
+        <div class="container hero-grid">
+          <div class="hero-copy">
+            <div class="hero-eyebrow">
+              <span class="dot" aria-hidden="true"></span>
+              <span lang="jp">ローカル開発ルーター — OSS / MIT</span>
+              <span lang="en">Local development router — OSS / MIT</span>
+            </div>
+            <h1 class="hero-title">
+              <span lang="jp">Compose のままで、<br />衝突を消す。</span>
+              <span lang="en">Compose as-is.<br />Conflicts gone.</span>
+            </h1>
+            <p class="hero-sub">
+              <span lang="jp">Compose as-is. Conflicts gone.</span>
+              <span lang="en">Compose のままで、衝突を消す。</span>
+            </p>
+            <p class="hero-lead">
+              <span lang="jp">複数のモノレポを並列起動すると、<code>web</code> も <code>admin</code> も同じ 3000 番を取り合います。<code>.env</code> を書き換え、ポート番号をチームで共有し直す手間が毎朝発生します。<br />DevRouter はこの port 衝突を、Traefik と Host ベース URL でアプリ無改造のまま解決します。</span>
+              <span lang="en">Spin up multiple monorepos in parallel and <code>web</code> and <code>admin</code> end up fighting for port 3000. You edit <code>.env</code>, reshuffle ports, and resync the URL with your team — every morning.<br />DevRouter solves the conflict via Traefik and host-based URLs, without changing a line in your app.</span>
+            </p>
+            <div class="hero-ctas">
+              <a class="btn btn-primary" href="https://github.com/simota/devrouter/releases" target="_blank" rel="noopener">
+                <span lang="jp">Get Started</span><span lang="en">Get Started</span>
+                <span class="btn-arrow" aria-hidden="true">→</span>
+              </a>
+              <a class="btn btn-secondary" href="https://github.com/simota/devrouter" target="_blank" rel="noopener">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.6 0-12 5.4-12 12 0 5.3 3.4 9.8 8.2 11.4.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1.1 1.9 2.9 1.4 3.6 1 .1-.8.4-1.4.8-1.7-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2 1-.3 2-.4 3-.4s2 .1 3 .4c2.3-1.5 3.3-1.2 3.3-1.2.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.8-1.6 8.2-6.1 8.2-11.4 0-6.6-5.4-12-12-12z" /></svg>
+                <span lang="jp">View on GitHub</span><span lang="en">View on GitHub</span>
+              </a>
+            </div>
+          </div>
+
+          <div class="hero-visual">
+            <!-- Hero diagram: 3 repos -> control tower -> URLs -->
+            <div class="hero-diagram" aria-hidden="true">
+              <svg viewBox="0 0 480 220" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="line-cyan" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#00e5ff" stop-opacity="0.2" /><stop offset="1" stop-color="#00e5ff" stop-opacity="0.9" /></linearGradient>
+                  <linearGradient id="line-green" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#00e5ff" stop-opacity="0.9" /><stop offset="1" stop-color="#39d353" stop-opacity="0.9" /></linearGradient>
+                </defs>
+                <g font-family="IBM Plex Mono, monospace" font-size="11" fill="#8b949e">
+                  <rect x="10" y="20" width="110" height="42" rx="6" fill="#151b23" stroke="#30363d" />
+                  <text x="22" y="38" fill="#e6edf3">repo: web</text><text x="22" y="54">:3000</text>
+                  <rect x="10" y="89" width="110" height="42" rx="6" fill="#151b23" stroke="#30363d" />
+                  <text x="22" y="107" fill="#e6edf3">repo: admin</text><text x="22" y="123">:3000 (!)</text>
+                  <rect x="10" y="158" width="110" height="42" rx="6" fill="#151b23" stroke="#30363d" />
+                  <text x="22" y="176" fill="#e6edf3">repo: api</text><text x="22" y="192">:8080</text>
+                </g>
+                <g stroke="url(#line-cyan)" stroke-width="1.5" fill="none">
+                  <path d="M120 41 C 170 41, 180 110, 220 110" />
+                  <path d="M120 110 L 220 110" />
+                  <path d="M120 179 C 170 179, 180 110, 220 110" />
+                </g>
+                <g>
+                  <rect x="220" y="78" width="80" height="64" rx="8" fill="#0f1419" stroke="#00e5ff" stroke-width="1.5" />
+                  <line x1="240" y1="98" x2="280" y2="98" stroke="#00e5ff" stroke-width="1.5" stroke-linecap="round" />
+                  <line x1="240" y1="110" x2="280" y2="110" stroke="#00e5ff" stroke-width="1.5" stroke-linecap="round" />
+                  <line x1="240" y1="122" x2="266" y2="122" stroke="#00e5ff" stroke-width="1.5" stroke-linecap="round" />
+                  <circle cx="278" cy="122" r="3" fill="#00e5ff"><animate attributeName="opacity" values="1;0.4;1" dur="2s" repeatCount="indefinite" /></circle>
+                  <text x="260" y="160" font-family="IBM Plex Mono, monospace" font-size="10" fill="#6e7681" text-anchor="middle">Traefik</text>
+                </g>
+                <g stroke="url(#line-green)" stroke-width="1.5" fill="none">
+                  <path d="M300 95 C 340 95, 340 41, 360 41" />
+                  <path d="M300 110 L 360 110" />
+                  <path d="M300 125 C 340 125, 340 179, 360 179" />
+                </g>
+                <g font-family="IBM Plex Mono, monospace" font-size="10">
+                  <rect x="360" y="20" width="115" height="42" rx="6" fill="#151b23" stroke="#30363d" />
+                  <text x="368" y="38" fill="#39d353">https://</text><text x="368" y="54" fill="#e6edf3">myrepo-web…</text>
+                  <rect x="360" y="89" width="115" height="42" rx="6" fill="#151b23" stroke="#30363d" />
+                  <text x="368" y="107" fill="#39d353">https://</text><text x="368" y="123" fill="#e6edf3">myrepo-admin…</text>
+                  <rect x="360" y="158" width="115" height="42" rx="6" fill="#151b23" stroke="#30363d" />
+                  <text x="368" y="176" fill="#39d353">https://</text><text x="368" y="192" fill="#e6edf3">myrepo-api…</text>
+                </g>
+              </svg>
+            </div>
+
+            <!-- Hero terminal -->
+            <div class="terminal" id="hero-terminal">
+              <div class="terminal-header">
+                <div class="terminal-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+                <span class="terminal-title">~/myrepo</span>
+                <button type="button" class="copy-btn" data-copy="#hero-terminal-body" aria-label="Copy commands">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15V5a2 2 0 012-2h10" /></svg>
+                  <span data-copy-label>copy</span>
+                </button>
+              </div>
+              <pre class="terminal-body" id="hero-terminal-body"><span class="prompt">$</span> devrouter daemon up
+<span class="ok">✓</span> Global Traefik started
+
+<span class="prompt">$</span> devrouter up ./myrepo
+<span class="ok">✓</span> Stack myrepo: 3 services
+
+<span class="prompt">$</span> devrouter ls
+myrepo-web    <span class="url-https">https://</span><span class="url-host">myrepo-web.localtest.me</span>    <span class="healthy">healthy</span>
+myrepo-api    <span class="url-https">https://</span><span class="url-host">myrepo-api.localtest.me</span>    <span class="healthy">healthy</span>
+myrepo-admin  <span class="url-https">https://</span><span class="url-host">myrepo-admin.localtest.me</span>  <span class="healthy">healthy</span></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============== Problem ============== -->
+      <section id="problem" aria-label="The problem">
+        <div class="container">
+          <span class="section-label" lang="jp">課題</span><span class="section-label" lang="en">The problem</span>
+          <h2 class="section-title">
+            <span lang="jp">並列起動が増えるほど、ポート管理が増える。</span>
+            <span lang="en">More parallel stacks, more port management.</span>
+          </h2>
+          <div class="problem-narrative">
+            <p lang="jp"><strong>web</strong> が 3000、<strong>admin</strong> も 3000、<strong>api</strong> は昨日 8080 に変えたはず。<code>.env</code> を毎回書き換え、Slack に貼った URL がチームで一致しない。並列起動するモノレポが 2-3 個になった時点で、ポート管理が日常作業になってしまいます。</p>
+            <p lang="en"><strong>web</strong> on 3000, <strong>admin</strong> also 3000, <strong>api</strong> moved to 8080 yesterday — or was it? You edit <code>.env</code> repeatedly, and the URL you pasted in Slack disagrees with your teammate's. Once you run two or three monorepos in parallel, port management becomes a daily chore.</p>
+          </div>
+
+          <div class="card-grid">
+            <article class="problem-card">
+              <span class="pain-tag">PORT 3000 already in use</span>
+              <h3><span lang="jp">繰り返される port 衝突</span><span lang="en">Recurring port conflicts</span></h3>
+              <p><span lang="jp">web も admin も 3000 を欲しがる。誰かを 3001 に逃がし、その変更を git に commit するか毎回迷う。</span><span lang="en">Both web and admin demand 3000. You bump one to 3001 and wonder, every time, whether to commit it.</span></p>
+            </article>
+            <article class="problem-card">
+              <span class="pain-tag">.env: rewriting again</span>
+              <h3><span lang="jp">毎朝の .env 書き換え</span><span lang="en">Daily .env rewrites</span></h3>
+              <p><span lang="jp">PORT、HOST、API_URL — 並列起動のたびに書き換え、commit に混ぜず、戻し忘れる。</span><span lang="en">PORT, HOST, API_URL — rewritten for every parallel run, kept out of commits, forgotten when reverted.</span></p>
+            </article>
+            <article class="problem-card">
+              <span class="pain-tag">URL drift across team</span>
+              <h3><span lang="jp">チームで違う localhost</span><span lang="en">Teammates' localhost differs</span></h3>
+              <p><span lang="jp"><code>localhost:5174</code> は URL ではなく座標。Slack に貼っても、隣の人の環境では別の何かが立っている。</span><span lang="en"><code>localhost:5174</code> is a coordinate, not a URL. Pasted in Slack, it points somewhere else on a teammate's machine.</span></p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============== Tenets ============== -->
+      <section id="tenets" aria-label="Three tenets">
+        <div class="container">
+          <span class="section-label" lang="jp">設計方針</span><span class="section-label" lang="en">Design principles</span>
+          <h2 class="section-title">
+            <span lang="jp">ローカル開発に、本番のような秩序を。</span>
+            <span lang="en">Production-like order for localhost.</span>
+          </h2>
+          <p class="section-lead">
+            <span lang="jp">DevRouter が一貫して守る、三つの方針。</span>
+            <span lang="en">Three principles DevRouter consistently follows.</span>
+          </p>
+          <div class="tenets-list">
+            <article class="tenet">
+              <div class="tenet-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
+              </div>
+              <div>
+                <div class="tenet-num">TENET 01</div>
+                <h3><span lang="jp">アプリは触らない</span><span lang="en">Don't Touch the App</span></h3>
+                <div class="tenet-en"><span lang="jp">Don't Touch the App</span><span lang="en">アプリは触らない</span></div>
+                <p><span lang="jp">port、host、proxy の設定はすべて外側のレイヤーで完結。アプリ側のコードは production と同じ状態を保ちます。</span><span lang="en">Ports, hosts, and proxy settings live one layer outside the app. Your app code stays identical to production.</span></p>
+              </div>
+            </article>
+            <article class="tenet">
+              <div class="tenet-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg>
+              </div>
+              <div>
+                <div class="tenet-num">TENET 02</div>
+                <h3><span lang="jp">ローカルにも、固定 URL を</span><span lang="en">Stable URLs for Localhost</span></h3>
+                <div class="tenet-en"><span lang="jp">Stable URLs for Localhost</span><span lang="en">ローカルにも、固定 URL を</span></div>
+                <p><span lang="jp"><code>localhost:5174</code> はチームで一致しません。<code>https://&lt;stack&gt;-&lt;svc&gt;.localtest.me</code> なら、ブックマークでき、共有でき、明日も同じ場所にあります。</span><span lang="en"><code>localhost:5174</code> never matches across a team. <code>https://&lt;stack&gt;-&lt;svc&gt;.localtest.me</code> is bookmarkable, shareable, and stable across days.</span></p>
+              </div>
+            </article>
+            <article class="tenet">
+              <div class="tenet-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v6a4 4 0 008 0V4" /><path d="M12 14a4 4 0 004 4 4 4 0 004-4v-2" /><circle cx="20" cy="10" r="2" /></svg>
+              </div>
+              <div>
+                <div class="tenet-num">TENET 03</div>
+                <h3><span lang="jp">再起動より、まず診断</span><span lang="en">Diagnose Before Restart</span></h3>
+                <div class="tenet-en"><span lang="jp">Diagnose Before Restart</span><span lang="en">再起動より、まず診断</span></div>
+                <p><span lang="jp"><code>devrouter doctor</code> で設定の不整合を検出し、原因を特定。再起動は最後の手段です。</span><span lang="en"><code>devrouter doctor</code> identifies misconfiguration and pinpoints the cause. Restart is a last resort.</span></p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============== How it works ============== -->
+      <section id="how-it-works" aria-label="How it works">
+        <div class="container">
+          <span class="section-label" lang="jp">仕組み</span><span class="section-label" lang="en">How it works</span>
+          <h2 class="section-title">
+            <span lang="jp">三つのコマンドで、URL が立つ。</span>
+            <span lang="en">Three commands. Real URLs.</span>
+          </h2>
+          <p class="section-lead">
+            <span lang="jp">グローバル Traefik が一つ立ち、各 stack はそこにぶら下がる。アプリ側は何も知りません。</span>
+            <span lang="en">A single global Traefik proxy. Each stack joins it. Your apps don't need to know.</span>
+          </p>
+          <div class="steps">
+            <div class="step">
+              <div class="step-num">STEP 01</div>
+              <h3><span lang="jp">管制塔を起動</span><span lang="en">Boot the tower</span></h3>
+              <code>devrouter daemon up</code>
+              <p><span lang="jp">グローバル Traefik が 80/443 を受けて、stack 共通の <code>devrouter_net</code> を用意します。</span><span lang="en">Global Traefik takes 80/443 and provisions the shared <code>devrouter_net</code> network.</span></p>
+            </div>
+            <div class="step">
+              <div class="step-num">STEP 02</div>
+              <h3><span lang="jp">stack を上げる</span><span lang="en">Bring up a stack</span></h3>
+              <code>devrouter up ./myrepo</code>
+              <p><span lang="jp">既存の <code>docker-compose</code> を読み、Traefik ラベルを足して起動。アプリは無改造のまま。</span><span lang="en">Reads your existing <code>docker-compose</code>, attaches Traefik labels, and starts. Apps are untouched.</span></p>
+            </div>
+            <div class="step">
+              <div class="step-num">STEP 03</div>
+              <h3><span lang="jp">URL でアクセス</span><span lang="en">Open the URL</span></h3>
+              <code>https://&lt;stack&gt;-&lt;svc&gt;.localtest.me</code>
+              <p><span lang="jp">Host ベースで自動振り分け。チームでブックマークできる、固定の URL。</span><span lang="en">Routed by host header. A stable URL the whole team can bookmark.</span></p>
+            </div>
+          </div>
+          <div class="flow-diagram" aria-hidden="true">
+            <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg">
+              <g font-family="IBM Plex Mono, monospace" font-size="12" fill="#8b949e">
+                <rect x="10" y="78" width="110" height="44" rx="8" fill="#151b23" stroke="#30363d" />
+                <text x="65" y="98" text-anchor="middle" fill="#e6edf3">Browser</text>
+                <text x="65" y="114" text-anchor="middle" font-size="10">Host header</text>
+                <line x1="120" y1="100" x2="180" y2="100" stroke="#00e5ff" stroke-width="1.5" />
+                <polygon points="180,96 188,100 180,104" fill="#00e5ff" />
+                <rect x="190" y="68" width="160" height="64" rx="8" fill="#0f1419" stroke="#00e5ff" stroke-width="1.5" />
+                <text x="270" y="92" text-anchor="middle" fill="#00e5ff">Global Traefik</text>
+                <text x="270" y="110" text-anchor="middle" font-size="10">listens on :80 / :443</text>
+                <circle cx="338" cy="78" r="3" fill="#00e5ff"><animate attributeName="opacity" values="1;0.4;1" dur="2s" repeatCount="indefinite" /></circle>
+                <line x1="350" y1="100" x2="410" y2="100" stroke="#39d353" stroke-width="1.5" />
+                <polygon points="410,96 418,100 410,104" fill="#39d353" />
+                <rect x="420" y="40" width="320" height="120" rx="8" fill="none" stroke="#30363d" stroke-dasharray="4 4" />
+                <text x="580" y="35" text-anchor="middle" font-size="10" fill="#6e7681">devrouter_net</text>
+                <rect x="440" y="55" width="280" height="28" rx="6" fill="#151b23" stroke="#39d353" stroke-opacity="0.4" />
+                <text x="450" y="74" fill="#e6edf3">myrepo-web :3000</text>
+                <text x="700" y="74" text-anchor="end" fill="#39d353" font-size="10">healthy</text>
+                <rect x="440" y="89" width="280" height="28" rx="6" fill="#151b23" stroke="#39d353" stroke-opacity="0.4" />
+                <text x="450" y="108" fill="#e6edf3">myrepo-admin :3001</text>
+                <text x="700" y="108" text-anchor="end" fill="#39d353" font-size="10">healthy</text>
+                <rect x="440" y="123" width="280" height="28" rx="6" fill="#151b23" stroke="#39d353" stroke-opacity="0.4" />
+                <text x="450" y="142" fill="#e6edf3">myrepo-api :4000</text>
+                <text x="700" y="142" text-anchor="end" fill="#39d353" font-size="10">healthy</text>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============== Features ============== -->
+      <section id="features" aria-label="Features">
+        <div class="container">
+          <span class="section-label" lang="jp">機能</span><span class="section-label" lang="en">Features</span>
+          <h2 class="section-title">
+            <span lang="jp">ローカルにも、ちゃんと URL を。</span>
+            <span lang="en">Real URLs for localhost.</span>
+          </h2>
+          <p class="section-lead">
+            <span lang="jp">必要なものだけ。決して多くない。</span>
+            <span lang="en">Only what you need. Nothing more.</span>
+          </p>
+          <div class="features-grid">
+            <article class="feature">
+              <div class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg></div>
+              <h3>Zero App Changes</h3>
+              <p><span lang="jp">アプリの設定は変更しません。port、host、proxy はすべて外側で。</span><span lang="en">No edits inside your app. Ports, hosts, and proxies live one layer up.</span></p>
+            </article>
+            <article class="feature">
+              <div class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20" /></svg></div>
+              <h3>Host-based URLs</h3>
+              <p><span lang="jp"><code>https://&lt;stack&gt;-&lt;svc&gt;.localtest.me</code> でチームに貼れる固定 URL。</span><span lang="en"><code>https://&lt;stack&gt;-&lt;svc&gt;.localtest.me</code> — a URL you can share with the team.</span></p>
+            </article>
+            <article class="feature">
+              <div class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" /><path d="M10 6.5h4M17.5 10v4M14 17.5h-4M6.5 14v-4" /></svg></div>
+              <h3>Automatic Routing</h3>
+              <p><span lang="jp">Traefik が Docker ラベルから経路を組み立てます。設定は最小限。</span><span lang="en">Traefik composes routes from Docker labels. Minimal config required.</span></p>
+            </article>
+            <article class="feature">
+              <div class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg></div>
+              <h3>HTTPS (mkcert)</h3>
+              <p><span lang="jp">ローカルでも本物の HTTPS。Service Worker や Secure cookie もそのまま。</span><span lang="en">Real HTTPS on localhost. Service Workers and Secure cookies just work.</span></p>
+            </article>
+            <article class="feature">
+              <div class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="14" rx="2" /><path d="M3 9h18M8 21h8M12 17v4" /></svg></div>
+              <h3><span lang="jp">Web UI 同梱</span><span lang="en">Web UI Included</span></h3>
+              <p><span lang="jp">ログ・依存・リソース・ヘルスを一画面で。<code>devrouter ui</code> で起動。</span><span lang="en">Logs, deps, resources, health — one screen. Run <code>devrouter ui</code>.</span></p>
+            </article>
+            <article class="feature">
+              <div class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 5.4L20 8l-4 4 1 6-5-2.6L7 18l1-6-4-4 5.6-.6z" /></svg></div>
+              <h3>AI-Assisted Configuration</h3>
+              <p><span lang="jp">同梱プロンプトを Claude や ChatGPT に渡せば、<code>devrouter.yaml</code> を初期生成できます。</span><span lang="en">Hand the bundled prompt to Claude or ChatGPT and get a first-pass <code>devrouter.yaml</code>.</span></p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============== Web UI Preview ============== -->
+      <section id="webui" aria-label="Web UI preview">
+        <div class="container">
+          <span class="section-label" lang="jp">Web UI</span><span class="section-label" lang="en">Web UI</span>
+          <h2 class="section-title">
+            <span lang="jp">リアルタイムでログ・依存・リソースを見る。</span>
+            <span lang="en">Live logs, deps, and resources — at a glance.</span>
+          </h2>
+          <div class="preview-frame" aria-hidden="true">
+            <div class="preview-toolbar">
+              <div class="terminal-dots"><span></span><span></span><span></span></div>
+              <span class="preview-toolbar-title">DevRouter UI · localhost:19847</span>
+            </div>
+            <div class="preview-body">
+              <aside class="preview-sidebar">
+                <span class="preview-sidebar-label">stacks</span>
+                <div class="preview-stack active"><span class="dot"></span>myrepo</div>
+                <div class="preview-stack"><span class="dot"></span>billing-api</div>
+                <div class="preview-stack"><span class="dot"></span>marketing-site</div>
+              </aside>
+              <div class="preview-main">
+                <div class="preview-stack-card">
+                  <div class="preview-stack-card-title">
+                    <span style="color: var(--accent-cyan)">myrepo</span>
+                    <span style="color: var(--text-tertiary); font-size: 0.6875rem; font-family: 'IBM Plex Mono', monospace">3 services</span>
+                  </div>
+                  <div class="preview-services">
+                    <div class="preview-service"><span class="name">web</span><span class="url">myrepo-web.localtest.me</span><span class="health"><span class="dot"></span>healthy</span></div>
+                    <div class="preview-service"><span class="name">api</span><span class="url">myrepo-api.localtest.me</span><span class="health"><span class="dot"></span>healthy</span></div>
+                    <div class="preview-service"><span class="name">admin</span><span class="url">myrepo-admin.localtest.me</span><span class="health"><span class="dot"></span>healthy</span></div>
+                  </div>
+                </div>
+                <div class="preview-log">
+                  <div><span class="log-info">[web]</span> ready in 412ms</div>
+                  <div><span class="log-info">[api]</span> listening on :4000</div>
+                  <div><span class="log-ok">[traefik]</span> routes mounted: 3</div>
+                  <div><span class="log-info">[watch]</span> apps/web/src changed → restart</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="preview-caption">
+            <span lang="jp">ヘルス、ログ、再起動 — 必要な情報が一画面に揃います。</span>
+            <span lang="en">Health, logs, restart — everything you need on a single screen.</span>
+          </p>
+        </div>
+      </section>
+
+      <!-- ============== Comparison ============== -->
+      <section id="vs" aria-label="Comparison">
+        <div class="container">
+          <span class="section-label" lang="jp">他ツールとの違い</span><span class="section-label" lang="en">vs. other tools</span>
+          <h2 class="section-title">
+            <span lang="jp">Roxy はルーター、DevRouter は管制塔。</span>
+            <span lang="en">Roxy is a router. DevRouter is a control tower.</span>
+          </h2>
+          <p class="section-lead">
+            <span lang="jp">領域が重なるツールはあります。立ち位置は違います。</span>
+            <span lang="en">Adjacent tools exist. The stance differs.</span>
+          </p>
+          <div class="comparison-wrapper">
+            <table class="comparison">
+              <thead>
+                <tr>
+                  <th scope="col"><span lang="jp">特徴</span><span lang="en">Capability</span></th>
+                  <th scope="col" class="featured">DevRouter</th>
+                  <th scope="col">Tilt</th>
+                  <th scope="col">Caddy</th>
+                  <th scope="col">Roxy</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row"><span lang="jp">言語非依存</span><span lang="en">Language-agnostic</span></th><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+                <tr><th scope="row"><span lang="jp">Compose 互換</span><span lang="en">Compose compatible</span></th><td class="yes">✓</td><td class="partial"><span lang="jp">部分</span><span lang="en">partial</span></td><td class="no">—</td><td class="no">—</td></tr>
+                <tr><th scope="row"><span lang="jp">モノレポ stack 抽象</span><span lang="en">Monorepo stack abstraction</span></th><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
+                <tr><th scope="row"><span lang="jp">Web UI 同梱</span><span lang="en">Web UI included</span></th><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
+                <tr><th scope="row">OSS</th><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+                <tr><th scope="row"><span lang="jp">macOS / Linux 両対応</span><span lang="en">macOS &amp; Linux</span></th><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="partial"><span lang="jp">macOS</span><span lang="en">macOS only</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="comparison-caption">
+            <span lang="jp">— <strong>Roxy はルーター、DevRouter は管制塔。</strong></span>
+            <span lang="en">— <strong>Roxy is a router. DevRouter is a control tower.</strong></span>
+          </p>
+        </div>
+      </section>
+
+      <!-- ============== Quick Start ============== -->
+      <section id="quickstart" aria-label="Quick start">
+        <div class="container">
+          <span class="section-label" lang="jp">3 分で開始</span><span class="section-label" lang="en">3-minute start</span>
+          <h2 class="section-title">
+            <span lang="jp">3 コマンドで、立ち上がる。</span>
+            <span lang="en">Three commands to get running.</span>
+          </h2>
+          <p class="section-lead">
+            <span lang="jp">macOS / Linux で動作確認。Docker が必要です。</span>
+            <span lang="en">Verified on macOS and Linux. Docker required.</span>
+          </p>
+
+          <div class="terminal" id="install-terminal" style="margin-bottom: 28px">
+            <div class="terminal-header">
+              <div class="terminal-dots"><span></span><span></span><span></span></div>
+              <span class="terminal-title"><span lang="jp">インストール</span><span lang="en">install</span></span>
+              <button type="button" class="copy-btn" data-copy="#install-body" aria-label="Copy install command">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15V5a2 2 0 012-2h10" /></svg>
+                <span data-copy-label>copy</span>
+              </button>
+            </div>
+            <pre class="terminal-body" id="install-body"><span class="comment"># macOS (Apple Silicon) / Linux (amd64) — see Releases for other arches</span>
+<span class="prompt">$</span> curl -L https://github.com/simota/devrouter/releases/latest/download/devrouter_darwin_arm64.tar.gz | tar xz
+<span class="prompt">$</span> sudo mv devrouter /usr/local/bin/</pre>
+          </div>
+
+          <div class="quickstart-grid">
+            <div class="qs-step">
+              <div class="qs-step-num">01</div>
+              <p><span lang="jp">グローバル Traefik を起動</span><span lang="en">Boot the global Traefik</span></p>
+              <div class="terminal" id="qs1">
+                <div class="terminal-header">
+                  <div class="terminal-dots"><span></span><span></span><span></span></div>
+                  <button type="button" class="copy-btn" data-copy="#qs1-body" aria-label="Copy command"><span data-copy-label>copy</span></button>
+                </div>
+                <pre class="terminal-body" id="qs1-body"><span class="prompt">$</span> devrouter daemon up</pre>
+              </div>
+            </div>
+            <div class="qs-step">
+              <div class="qs-step-num">02</div>
+              <p><span lang="jp">monorepo を立ち上げる</span><span lang="en">Bring up your monorepo</span></p>
+              <div class="terminal" id="qs2">
+                <div class="terminal-header">
+                  <div class="terminal-dots"><span></span><span></span><span></span></div>
+                  <button type="button" class="copy-btn" data-copy="#qs2-body" aria-label="Copy command"><span data-copy-label>copy</span></button>
+                </div>
+                <pre class="terminal-body" id="qs2-body"><span class="prompt">$</span> devrouter up ./myrepo</pre>
+              </div>
+            </div>
+            <div class="qs-step">
+              <div class="qs-step-num">03</div>
+              <p><span lang="jp">URL を確認する</span><span lang="en">List the URLs</span></p>
+              <div class="terminal" id="qs3">
+                <div class="terminal-header">
+                  <div class="terminal-dots"><span></span><span></span><span></span></div>
+                  <button type="button" class="copy-btn" data-copy="#qs3-body" aria-label="Copy command"><span data-copy-label>copy</span></button>
+                </div>
+                <pre class="terminal-body" id="qs3-body"><span class="prompt">$</span> devrouter ls</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============== AI section ============== -->
+      <section id="ai" aria-label="AI-assisted configuration">
+        <div class="container">
+          <span class="section-label" lang="jp">AI 時代の dev tool</span><span class="section-label" lang="en">Built for the AI era</span>
+          <h2 class="section-title">
+            <span lang="jp">設定はもう、AI に書いてもらう。</span>
+            <span lang="en">Let the AI write your config.</span>
+          </h2>
+          <p class="section-lead">
+            <span lang="jp">同梱の prompt を Claude / ChatGPT に渡すだけ。プロジェクトを読み、設定 2 ファイルを生成します。</span>
+            <span lang="en">Hand the bundled prompt to Claude or ChatGPT. It reads your project and emits two config files.</span>
+          </p>
+          <div class="ai-block">
+            <p><span lang="jp">DevRouter は <code>prompts/generate-config.md</code> に設定生成プロンプトを同梱しています。AI が <code>devrouter.yaml</code> と <code>docker-compose.devrouter.yml</code> の初期版を出力します。</span><span lang="en">DevRouter ships <code>prompts/generate-config.md</code>. The AI produces a first draft of <code>devrouter.yaml</code> and <code>docker-compose.devrouter.yml</code>.</span></p>
+            <blockquote class="ai-quote">
+              <span lang="jp">You are an expert at generating DevRouter configuration files. Analyze the codebase in the specified directory and generate <code>devrouter.yaml</code> and <code>docker-compose.devrouter.yml</code>…</span>
+              <span lang="en">You are an expert at generating DevRouter configuration files. Analyze the codebase in the specified directory and generate <code>devrouter.yaml</code> and <code>docker-compose.devrouter.yml</code>…</span>
+            </blockquote>
+            <a class="btn btn-secondary" href="https://github.com/simota/devrouter/blob/main/prompts/generate-config.md" target="_blank" rel="noopener">
+              <span lang="jp">プロンプト全文を見る</span><span lang="en">Read the full prompt</span>
+              <span class="btn-arrow" aria-hidden="true">→</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============== Final CTA ============== -->
+      <section class="cta-final" aria-label="Final call to action">
+        <div class="container">
+          <h2>
+            <span lang="jp">port 衝突を、今日から無くす。</span>
+            <span lang="en">Stop port conflicts today.</span>
+          </h2>
+          <p>
+            <span lang="jp">OSS / MIT。Docker があれば動きます。</span>
+            <span lang="en">OSS / MIT. Works wherever Docker does.</span>
+          </p>
+          <div class="hero-ctas">
+            <a class="btn btn-primary" href="https://github.com/simota/devrouter/releases" target="_blank" rel="noopener">
+              <span lang="jp">Get Started</span><span lang="en">Get Started</span>
+              <span class="btn-arrow" aria-hidden="true">→</span>
+            </a>
+            <a class="btn btn-secondary" href="https://github.com/simota/devrouter#readme" target="_blank" rel="noopener">
+              <span lang="jp">Docs を読む</span><span lang="en">Read the docs</span>
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ============== Footer ============== -->
+    <footer class="site-footer">
+      <div class="container footer-grid">
+        <div class="footer-brand">
+          <a href="#top" class="nav-logo" aria-label="DevRouter home">
+            <span class="logo-icon" style="width: 22px; height: 22px"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" /><circle cx="18" cy="18" r="3" fill="currentColor" class="pulse" /></svg></span>
+            <span class="nav-logo-text">DevRouter</span>
+          </a>
+          <span>MIT &copy; 2025 simota</span>
+          <span style="opacity: 0.7"><span lang="jp">ローカル開発に、本番のような秩序を。</span><span lang="en">Production-like order for localhost.</span></span>
+        </div>
+        <nav class="footer-links" aria-label="Project links">
+          <a href="https://github.com/simota/devrouter" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/simota/devrouter/issues" target="_blank" rel="noopener">Issues</a>
+          <a href="https://github.com/simota/devrouter/discussions" target="_blank" rel="noopener">Discussions</a>
+          <a href="https://github.com/simota/devrouter/releases" target="_blank" rel="noopener">Releases</a>
+        </nav>
+        <div class="footer-clock" aria-hidden="true">
+          <div class="clock-label">localtime</div>
+          <div class="clock-value" data-clock>--:--:--</div>
+          <div style="margin-top: 6px; font-size: 0.6875rem">
+            <span lang="jp">made for monorepo dev</span>
+            <span lang="en">made for monorepo dev</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <script src="main.js"></script>
+  </body>
+</html>
