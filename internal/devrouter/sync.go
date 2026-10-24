@@ -1,6 +1,7 @@
 package devrouter
 
 import (
+	"reflect"
 	"time"
 )
 
@@ -11,11 +12,15 @@ func SyncRegistry() error {
 		return err
 	}
 
-	updated := false
+	type observation struct {
+		stack      StackRecord
+		lastDownAt string
+	}
+	observations := make(map[string]observation)
 	now := time.Now().UTC().Format(time.RFC3339)
 
-	for i, stack := range reg.Stacks {
-		states, err := ComposePs(stack.ComposeFilePath)
+	for _, stack := range reg.Stacks {
+		states, err := composePsFresh(stack.ComposeFilePath)
 		if err != nil {
 			// Compose file doesn't exist or Docker error - skip
 			continue
@@ -30,21 +35,32 @@ func SyncRegistry() error {
 			}
 		}
 
-		// If no containers or all stopped, and LastDownAt is not set
-		if (len(states) == 0 || allStopped) && reg.Stacks[i].LastDownAt == "" {
-			reg.Stacks[i].LastDownAt = now
-			updated = true
+		if allStopped && stack.LastDownAt == "" {
+			observations[stack.ID] = observation{stack: stack, lastDownAt: now}
 		}
 
 		// If containers are running, clear LastDownAt
-		if len(states) > 0 && !allStopped && reg.Stacks[i].LastDownAt != "" {
-			reg.Stacks[i].LastDownAt = ""
-			updated = true
+		if !allStopped && stack.LastDownAt != "" {
+			observations[stack.ID] = observation{stack: stack}
 		}
 	}
 
-	if updated {
-		return SaveRegistry(reg)
+	if len(observations) == 0 {
+		return nil
 	}
-	return nil
+	return updateRegistry(func(current *Registry) (bool, error) {
+		updated := false
+		for i := range current.Stacks {
+			stack := &current.Stacks[i]
+			observed, ok := observations[stack.ID]
+			// Docker was queried without holding the registry lock. Discard
+			// results if this stack changed or was replaced in the meantime.
+			if !ok || !reflect.DeepEqual(*stack, observed.stack) {
+				continue
+			}
+			stack.LastDownAt = observed.lastDownAt
+			updated = true
+		}
+		return updated, nil
+	})
 }

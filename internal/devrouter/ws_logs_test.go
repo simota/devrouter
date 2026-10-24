@@ -159,14 +159,6 @@ func newLogStreamHarness(t *testing.T, mode, service string) *logStreamHarness {
 	t.Helper()
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
-	resetCache := func() {
-		registryMu.Lock()
-		registryCache = nil
-		registryCacheTime = time.Time{}
-		registryMu.Unlock()
-	}
-	resetCache()
-	t.Cleanup(resetCache)
 	executable, err := filepath.Abs(os.Args[0])
 	if err != nil {
 		t.Fatal(err)

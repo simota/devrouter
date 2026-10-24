@@ -80,6 +80,7 @@ type Registry struct {
 
 type StackRecord struct {
 	ID              string          `json:"id"`
+	Revision        string          `json:"revision,omitempty"`
 	Name            string          `json:"name"`
 	RepoPath        string          `json:"repoPath"`
 	Source          string          `json:"source"`

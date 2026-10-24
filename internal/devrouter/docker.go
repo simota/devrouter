@@ -128,6 +128,24 @@ func getComposeContainersContext(ctx context.Context, composePath string) ([]Con
 	}
 	psCacheMu.Unlock()
 
+	containers, err := readComposeContainersContext(ctx, composePath)
+	if err != nil {
+		return nil, err
+	}
+
+	psCacheMu.Lock()
+	psCache[composePath] = psCacheEntry{
+		containers: containers,
+		timestamp:  time.Now(),
+	}
+	psCacheMu.Unlock()
+
+	return containers, nil
+}
+
+// readComposeContainersContext bypasses the polling cache. Persisted registry
+// updates must observe Docker after taking their registry snapshot.
+func readComposeContainersContext(ctx context.Context, composePath string) ([]ContainerInfo, error) {
 	// Optimized: Use DockerOutputBytes to avoid string allocation
 	output, err := dockerOutputBytesContext(ctx, "compose", "-f", composePath, "ps", "--format", "json")
 	if err != nil {
@@ -153,13 +171,6 @@ func getComposeContainersContext(ctx context.Context, composePath string) ([]Con
 		}
 	}
 
-	psCacheMu.Lock()
-	psCache[composePath] = psCacheEntry{
-		containers: containers,
-		timestamp:  time.Now(),
-	}
-	psCacheMu.Unlock()
-
 	return containers, nil
 }
 
@@ -173,7 +184,18 @@ func composePsContext(ctx context.Context, composePath string) (map[string]strin
 	if err != nil {
 		return nil, err
 	}
+	return composeContainerStates(containers), nil
+}
 
+func composePsFresh(composePath string) (map[string]string, error) {
+	containers, err := readComposeContainersContext(context.Background(), composePath)
+	if err != nil {
+		return nil, err
+	}
+	return composeContainerStates(containers), nil
+}
+
+func composeContainerStates(containers []ContainerInfo) map[string]string {
 	result := make(map[string]string)
 	for _, entry := range containers {
 		// Normalize state to: running, stopped, exited
@@ -184,7 +206,7 @@ func composePsContext(ctx context.Context, composePath string) (map[string]strin
 		result[entry.Service] = state
 	}
 
-	return result, nil
+	return result
 }
 
 func ComposeExec(composePath string, service string, command []string, opts ExecOptions) error {
