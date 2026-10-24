@@ -4,11 +4,13 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os/exec"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -34,10 +36,12 @@ var upgrader = websocket.Upgrader{
 }
 
 const (
-	writeWait      = 10 * time.Second
-	pongWait       = 60 * time.Second
-	pingPeriod     = (pongWait * 9) / 10
-	maxMessageSize = 512
+	writeWait           = 10 * time.Second
+	pongWait            = 60 * time.Second
+	pingPeriod          = (pongWait * 9) / 10
+	maxMessageSize      = 512
+	maxLogLineSize      = 1024 * 1024
+	logPreflightTimeout = 10 * time.Second
 )
 
 // handleLogsWebSocket streams logs for an entire stack
@@ -84,22 +88,75 @@ func (s *Server) streamLogs(w http.ResponseWriter, r *http.Request, stackID, ser
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	ctx, cancel := context.WithCancel(r.Context())
+	conn.SetReadLimit(maxMessageSize)
+	conn.SetReadDeadline(time.Now().Add(pongWait))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+	readDone := make(chan struct{})
+	go func() {
+		defer close(readDone)
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				cancel()
+				return
+			}
+		}
+	}()
+	defer func() {
+		cancel()
+		conn.Close()
+		<-readDone
+	}()
+	// Start the heartbeat clock with the read deadline so a slow preflight
+	// cannot delay the first ping beyond that deadline.
+	pingTicker := time.NewTicker(pingPeriod)
+	defer pingTicker.Stop()
+	finish := func(errorMessage string) {
+		if errorMessage != "" {
+			if err := sendLogMessage(conn, LogMessage{
+				Type:      "error",
+				Timestamp: time.Now().UTC().Format(time.RFC3339),
+				Content:   errorMessage,
+			}); err != nil {
+				return
+			}
+		}
+		if err := sendLogMessage(conn, LogMessage{
+			Type:      "disconnected",
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+			Content:   "disconnected from logs",
+		}); err != nil {
+			return
+		}
+		conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Now().Add(writeWait))
+	}
 
-	sendLogMessage(conn, LogMessage{
+	if err := sendLogMessage(conn, LogMessage{
 		Type:      "connected",
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Content:   "connected to logs: " + stackID,
-	})
+	}); err != nil {
+		return
+	}
 
 	// Check container states and send warning if needed
-	containerStates, err := ComposePs(stack.ComposeFilePath)
+	preflightCtx, cancelPreflight := context.WithTimeout(ctx, logPreflightTimeout)
+	containerStates, err := composePsContext(preflightCtx, stack.ComposeFilePath)
+	cancelPreflight()
+	if ctx.Err() != nil {
+		return
+	}
 	if err != nil {
-		sendLogMessage(conn, LogMessage{
+		if err := sendLogMessage(conn, LogMessage{
 			Type:      "warning",
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
 			Content:   "Failed to check container state: " + err.Error(),
-		})
+		}); err != nil {
+			return
+		}
 	} else {
 		allStopped := true
 		for _, state := range containerStates {
@@ -109,32 +166,35 @@ func (s *Server) streamLogs(w http.ResponseWriter, r *http.Request, stackID, ser
 			}
 		}
 		if len(containerStates) == 0 {
-			sendLogMessage(conn, LogMessage{
+			if err := sendLogMessage(conn, LogMessage{
 				Type:      "warning",
 				Timestamp: time.Now().UTC().Format(time.RFC3339),
 				Content:   "No containers found. The stack may have been stopped or removed.",
-			})
+			}); err != nil {
+				return
+			}
 		} else if allStopped {
-			sendLogMessage(conn, LogMessage{
+			if err := sendLogMessage(conn, LogMessage{
 				Type:      "warning",
 				Timestamp: time.Now().UTC().Format(time.RFC3339),
 				Content:   "All containers are stopped. No new logs will appear.",
-			})
+			}); err != nil {
+				return
+			}
 		} else if serviceName != "" {
 			// Check specific service
 			state := containerStates[composeService]
 			if state != "running" {
-				sendLogMessage(conn, LogMessage{
+				if err := sendLogMessage(conn, LogMessage{
 					Type:      "warning",
 					Timestamp: time.Now().UTC().Format(time.RFC3339),
 					Content:   "Container '" + serviceName + "' is not running (state: " + state + ").",
-				})
+				}); err != nil {
+					return
+				}
 			}
 		}
 	}
-
-	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
 
 	args := []string{"compose", "-f", stack.ComposeFilePath, "logs", "-f", "--tail=100"}
 	if composeService != "" {
@@ -142,88 +202,113 @@ func (s *Server) streamLogs(w http.ResponseWriter, r *http.Request, stackID, ser
 	}
 
 	cmd := exec.CommandContext(ctx, "docker", args...)
+	configureCommandCancellation(cmd)
+	cmd.WaitDelay = time.Second
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		sendLogMessage(conn, LogMessage{Type: "error", Content: err.Error()})
+		finish(err.Error())
 		return
 	}
+	defer stdout.Close()
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		sendLogMessage(conn, LogMessage{Type: "error", Content: err.Error()})
+		finish(err.Error())
 		return
 	}
+	defer stderr.Close()
 
 	if err := cmd.Start(); err != nil {
-		sendLogMessage(conn, LogMessage{Type: "error", Content: err.Error()})
+		finish(err.Error())
 		return
 	}
 
+	// Pipe readers only enqueue messages. This handler owns every WebSocket
+	// write, including pings and terminal messages.
+	messages := make(chan LogMessage)
+	scanErrors := make(chan error, 2)
 	resolver := newLogServiceResolver(stack, serviceLabel)
-	done := make(chan struct{})
-	go pipeToWebSocket(conn, stdout, done, resolver)
-	go pipeToWebSocket(conn, stderr, done, resolver)
+	var readers sync.WaitGroup
+	for _, reader := range []io.Reader{stdout, stderr} {
+		readers.Add(1)
+		go func(reader io.Reader) {
+			defer readers.Done()
+			if err := pipeLogMessages(ctx, reader, messages, resolver); err != nil {
+				scanErrors <- err
+			}
+		}(reader)
+	}
 
-	conn.SetReadLimit(maxMessageSize)
-	conn.SetReadDeadline(time.Now().Add(pongWait))
-	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(pongWait))
-		return nil
-	})
-
+	processDone := make(chan struct{})
+	var waitErr error
 	go func() {
-		ticker := time.NewTicker(pingPeriod)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				conn.SetWriteDeadline(time.Now().Add(writeWait))
-				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-					cancel()
-					return
-				}
-			case <-done:
-				return
-			case <-ctx.Done():
+		// Wait must not close the pipes before their buffered output is drained.
+		readers.Wait()
+		waitErr = cmd.Wait()
+		close(processDone)
+	}()
+	defer func() {
+		cancel()
+		stdout.Close()
+		stderr.Close()
+		<-processDone
+	}()
+	for {
+		select {
+		case msg := <-messages:
+			if err := sendLogMessage(conn, msg); err != nil {
 				return
 			}
-		}
-	}()
-
-	for {
-		_, _, err := conn.ReadMessage()
-		if err != nil {
-			cancel()
-			break
+		case err := <-scanErrors:
+			finish("read logs: " + err.Error())
+			return
+		case <-processDone:
+			// A scan error can arrive together with process completion. Preserve it
+			// instead of reporting a successful end of the stream.
+			errorMessage := ""
+			select {
+			case err := <-scanErrors:
+				errorMessage = "read logs: " + err.Error()
+			default:
+				if waitErr != nil {
+					errorMessage = "docker logs failed: " + waitErr.Error()
+				}
+			}
+			finish(errorMessage)
+			return
+		case <-pingTicker.C:
+			conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
+		case <-ctx.Done():
+			return
 		}
 	}
-
-	cmd.Wait()
-	close(done)
-
-	sendLogMessage(conn, LogMessage{
-		Type:      "disconnected",
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
-		Content:   "disconnected from logs",
-	})
 }
 
-func pipeToWebSocket(conn *websocket.Conn, reader io.Reader, done chan struct{}, resolver logServiceResolver) {
+func pipeLogMessages(ctx context.Context, reader io.Reader, messages chan<- LogMessage, resolver logServiceResolver) error {
 	scanner := bufio.NewScanner(reader)
+	// The limit applies to the raw line (including the Compose prefix), excluding
+	// its LF or CRLF delimiter. Leave room for either delimiter in Scanner's buffer.
+	scanner.Buffer(make([]byte, 64*1024), maxLogLineSize+2)
 	for scanner.Scan() {
+		if len(scanner.Bytes()) > maxLogLineSize {
+			return fmt.Errorf("log line exceeds %d bytes", maxLogLineSize)
+		}
+		service, content := resolver.resolve(scanner.Text())
+		msg := LogMessage{
+			Type:      "log",
+			Service:   service,
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+			Content:   content,
+		}
 		select {
-		case <-done:
-			return
-		default:
-			line := scanner.Text()
-			service, content := resolver.resolve(line)
-			sendLogMessage(conn, LogMessage{
-				Type:      "log",
-				Service:   service,
-				Timestamp: time.Now().UTC().Format(time.RFC3339),
-				Content:   content,
-			})
+		case messages <- msg:
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
+	return scanner.Err()
 }
 
 type logServiceResolver struct {
