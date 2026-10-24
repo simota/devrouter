@@ -12,15 +12,6 @@ import (
 
 func TestStartWatchRequestValidation(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	// Isolate this registry from the process-wide cache used by other tests.
-	resetCache := func() {
-		registryMu.Lock()
-		registryCache = nil
-		registryCacheTime = time.Time{}
-		registryMu.Unlock()
-	}
-	resetCache()
-	t.Cleanup(resetCache)
 	stack := StackRecord{ID: "watch-api-test", Name: "watch-api-test", RepoPath: t.TempDir()}
 	if err := SaveRegistry(Registry{Stacks: []StackRecord{stack}}); err != nil {
 		t.Fatal(err)

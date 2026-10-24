@@ -246,6 +246,29 @@ Host (80/443) --> Traefik (global) --> devrouter_net --> [myrepo-web:3000]
 2. **Stack containers** join the shared `devrouter_net` network
 3. **Host-based routing** directs requests to the correct `stack-service` container
 
+### Registry consistency
+
+The registry at `~/.devrouter/registry.json` is read as an independent snapshot
+on every load. On macOS and Linux, registry changes from `up`, `down`, and the
+UI's background sync use a short read-modify-write transaction protected by
+`registry.json.lock`. Keep this lock file in place while DevRouter processes
+are running. Updates use atomic replacement so readers see a complete file,
+and concurrent operations preserve changes to unrelated stacks.
+
+Each successful `up` records a new revision. A delayed `down` preserves a
+replacement stack and reports a conflict. Background sync queries Docker
+without the UI's polling cache and discards observations when the corresponding
+registry record has changed. Docker commands run outside the registry lock;
+operations on the same stack are not serialized end to end, and registry
+conflict detection does not roll back Docker changes or guarantee that the
+registry and Docker are always in agreement.
+
+The optional `revision` field is compatible with existing version-1 registry
+files; no migration is required. Restart all DevRouter CLI/UI processes on the
+updated version to obtain these guarantees: older versions do not participate
+in locking. Registry storage must support advisory file locks and atomic
+rename. Atomic replacement does not provide a power-loss durability guarantee.
+
 ## Troubleshooting
 
 | Issue | Solution |

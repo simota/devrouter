@@ -1,55 +1,34 @@
 package devrouter
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 )
 
 const registryVersion = 1
 
-var (
-	registryCache     *Registry
-	registryCacheTime time.Time
-	registryMu        sync.RWMutex
-)
-
+// LoadRegistry returns an independent snapshot of the current registry file.
 func LoadRegistry() (Registry, error) {
 	path, err := RegistryPath()
 	if err != nil {
 		return Registry{}, err
 	}
 
-	info, err := os.Stat(path)
+	return loadRegistry(path)
+}
+
+func loadRegistry(path string) (Registry, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return Registry{Version: registryVersion, Stacks: []StackRecord{}}, nil
 		}
-		return Registry{}, err
-	}
-
-	registryMu.RLock()
-	if registryCache != nil && !registryCacheTime.Before(info.ModTime()) {
-		reg := *registryCache
-		registryMu.RUnlock()
-		return reg, nil
-	}
-	registryMu.RUnlock()
-
-	registryMu.Lock()
-	defer registryMu.Unlock()
-
-	// Double-check after acquiring write lock
-	if registryCache != nil && !registryCacheTime.Before(info.ModTime()) {
-		return *registryCache, nil
-	}
-
-	data, err := os.ReadFile(path)
-	if err != nil {
 		return Registry{}, err
 	}
 
@@ -64,26 +43,63 @@ func LoadRegistry() (Registry, error) {
 		reg.Version = registryVersion
 	}
 
-	registryCache = &reg
-	registryCacheTime = info.ModTime()
-
 	return reg, nil
 }
 
+// SaveRegistry replaces the whole registry. Read-modify-write callers must use
+// updateRegistry so another process's changes are preserved.
 func SaveRegistry(reg Registry) error {
 	path, err := RegistryPath()
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	lock, err := lockRegistry(path)
+	if err != nil {
 		return err
 	}
+	defer lock.Close()
+	return saveRegistry(path, reg)
+}
+
+// updateRegistry runs a short read-modify-write transaction across processes.
+// The callback must not perform Docker operations or call registry writers.
+func updateRegistry(update func(*Registry) (bool, error)) error {
+	path, err := RegistryPath()
+	if err != nil {
+		return err
+	}
+	lock, err := lockRegistry(path)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
+
+	reg, err := loadRegistry(path)
+	if err != nil {
+		return err
+	}
+	changed, err := update(&reg)
+	if err != nil || !changed {
+		return err
+	}
+	return saveRegistry(path, reg)
+}
+
+func saveRegistry(path string, reg Registry) error {
 	reg.Version = registryVersion
 	payload, err := json.MarshalIndent(reg, "", "  ")
 	if err != nil {
 		return err
 	}
 	return writeFileAtomic(path, payload)
+}
+
+func newStackRevision() (string, error) {
+	var revision [16]byte
+	if _, err := rand.Read(revision[:]); err != nil {
+		return "", fmt.Errorf("generate stack revision: %w", err)
+	}
+	return hex.EncodeToString(revision[:]), nil
 }
 
 func UpsertStack(reg Registry, stack StackRecord) Registry {

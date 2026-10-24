@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"time"
@@ -69,6 +70,10 @@ func Up(repoPath string, opts UpOptions) (StackRecord, []string, error) {
 			return StackRecord{}, nil, err
 		}
 	}
+	revision, err := newStackRevision()
+	if err != nil {
+		return StackRecord{}, nil, err
+	}
 	if err := CheckDocker(); err != nil {
 		return StackRecord{}, nil, err
 	}
@@ -89,14 +94,16 @@ func Up(repoPath string, opts UpOptions) (StackRecord, []string, error) {
 		if err := ComposeDown(existing.ComposeFilePath); err != nil {
 			return StackRecord{}, nil, err
 		}
-		reg, _ = RemoveStack(reg, existing.ID)
 	}
 	if err := ComposeUp(composePath, opts.Build); err != nil {
 		return StackRecord{}, nil, err
 	}
 	record := StackRecordFromSpec(stack, composePath, source, scheme)
-	reg = UpsertStack(reg, record)
-	if err := SaveRegistry(reg); err != nil {
+	record.Revision = revision
+	if err := updateRegistry(func(current *Registry) (bool, error) {
+		*current = UpsertStack(*current, record)
+		return true, nil
+	}); err != nil {
 		return StackRecord{}, nil, err
 	}
 
@@ -129,8 +136,25 @@ func Down(opts DownOptions) (StackRecord, error) {
 	if err := ComposeDown(stack.ComposeFilePath); err != nil {
 		return StackRecord{}, err
 	}
-	reg, _ = RemoveStack(reg, stack.ID)
-	if err := SaveRegistry(reg); err != nil {
+	if err := updateRegistry(func(current *Registry) (bool, error) {
+		for _, latest := range current.Stacks {
+			if latest.ID != stack.ID && latest.RepoPath != stack.RepoPath {
+				continue
+			}
+			// A background sync may change only LastDownAt while Docker stops.
+			// Any other change means this operation observed an older stack.
+			observed := stack
+			latest.LastDownAt = ""
+			observed.LastDownAt = ""
+			if !reflect.DeepEqual(latest, observed) {
+				return false, fmt.Errorf("stack %s changed while stopping containers; its registry entry was preserved", stack.ID)
+			}
+			var removed bool
+			*current, removed = RemoveStack(*current, stack.ID)
+			return removed, nil
+		}
+		return false, nil
+	}); err != nil {
 		return StackRecord{}, err
 	}
 
