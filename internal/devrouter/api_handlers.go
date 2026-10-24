@@ -845,7 +845,21 @@ func (s *Server) handleStartWatch(w http.ResponseWriter, r *http.Request) {
 	var config WatchConfig
 	if r.Body != nil {
 		r.Body = http.MaxBytesReader(w, r.Body, maxJSONBodySize)
-		json.NewDecoder(r.Body).Decode(&config)
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&config); err != nil && !errors.Is(err, io.EOF) {
+			s.writeError(w, http.StatusBadRequest, "WATCH_REQUEST_INVALID", err.Error())
+			return
+		}
+		// Consume trailing whitespace as well so the limit covers the whole body,
+		// and reject additional JSON values before changing an existing watcher.
+		var extra any
+		if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+			if err == nil {
+				err = errors.New("request body must contain a single JSON value")
+			}
+			s.writeError(w, http.StatusBadRequest, "WATCH_REQUEST_INVALID", err.Error())
+			return
+		}
 	}
 	config.Enabled = true
 

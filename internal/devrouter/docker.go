@@ -2,6 +2,7 @@ package devrouter
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -113,6 +114,10 @@ var (
 
 // GetComposeContainers returns detailed information about containers in the stack
 func GetComposeContainers(composePath string) ([]ContainerInfo, error) {
+	return getComposeContainersContext(context.Background(), composePath)
+}
+
+func getComposeContainersContext(ctx context.Context, composePath string) ([]ContainerInfo, error) {
 	psCacheMu.Lock()
 	if entry, ok := psCache[composePath]; ok {
 		// Cache for 2 seconds to avoid thundering herd on polling
@@ -124,7 +129,7 @@ func GetComposeContainers(composePath string) ([]ContainerInfo, error) {
 	psCacheMu.Unlock()
 
 	// Optimized: Use DockerOutputBytes to avoid string allocation
-	output, err := DockerOutputBytes("compose", "-f", composePath, "ps", "--format", "json")
+	output, err := dockerOutputBytesContext(ctx, "compose", "-f", composePath, "ps", "--format", "json")
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +165,11 @@ func GetComposeContainers(composePath string) ([]ContainerInfo, error) {
 
 // ComposePs returns a map of service name to container state (running/exited/stopped/not_found)
 func ComposePs(composePath string) (map[string]string, error) {
-	containers, err := GetComposeContainers(composePath)
+	return composePsContext(context.Background(), composePath)
+}
+
+func composePsContext(ctx context.Context, composePath string) (map[string]string, error) {
+	containers, err := getComposeContainersContext(ctx, composePath)
 	if err != nil {
 		return nil, err
 	}
@@ -204,12 +213,25 @@ func DockerOutput(args ...string) (string, error) {
 }
 
 func DockerOutputBytes(args ...string) ([]byte, error) {
-	cmd := exec.Command("docker", args...)
+	return dockerOutputBytesContext(context.Background(), args...)
+}
+
+func dockerOutputBytesContext(ctx context.Context, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	if ctx.Done() != nil {
+		configureCommandCancellation(cmd)
+		// A Docker plugin may inherit the output pipes. Bound I/O cleanup after
+		// cancellation even if those pipes outlive the direct child process.
+		cmd.WaitDelay = time.Second
+	}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		msg := strings.TrimSpace(stderr.String())
 		if msg == "" {
 			msg = err.Error()

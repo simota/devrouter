@@ -113,6 +113,13 @@ Launch with `devrouter ui` to access a browser-based management interface:
 - **Service Templates** - Quick-add PostgreSQL, Redis, MongoDB, and more
 - **Desktop Notifications** - Browser notifications for service status changes
 
+Log streams close when the underlying Docker log command ends. Failures reading
+the log output or running the command are reported in the log panel. Individual
+log lines are limited to 1 MiB, including any Docker Compose prefix and excluding
+LF/CRLF line endings. An oversized line reports an error and closes the stream
+instead of silently stopping delivery. Selecting another stack closes the
+previous log connection before opening the new one.
+
 ## Configuration
 
 Create `devrouter.yaml` in your repository root to customize behavior. Use `devrouter init` to auto-generate from existing `docker-compose.yaml` and `package.json`.
@@ -184,6 +191,11 @@ watch:
     - pattern: "*.go"
       action: restart
 ```
+
+The Web UI's `POST /api/stacks/{stackID}/watch/start` endpoint accepts an optional
+JSON configuration with a 1 MiB request-body limit. Malformed JSON, invalid field
+types, extra JSON values, and oversized bodies return HTTP 400 before changing
+any watcher. An existing watcher keeps running if a request is rejected.
 
 ### AI-Assisted Configuration
 
@@ -283,6 +295,30 @@ Use `devrouter doctor` to diagnose common configuration issues.
 ## Contributing
 
 Contributions are welcome! Please feel free to submit issues and pull requests.
+
+### Local validation
+
+Build the frontend before running Go checks, because the Go binary embeds its
+generated assets:
+
+```bash
+cd web
+pnpm install --frozen-lockfile
+pnpm run build
+cd ..
+make test
+make lint
+go test -race ./...
+make build-go
+```
+
+Pull requests run frontend tests, Svelte/TypeScript checks, Go vet, Go tests with
+the race detector, and builds on both Go 1.20 and the current stable Go release
+on Linux, plus the stable Go release on macOS.
+The log-stream regression tests use a temporary fake Docker executable and real
+WebSocket connections, so they do not require a Docker daemon.
+
+### Submitting changes
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)

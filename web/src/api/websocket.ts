@@ -1,8 +1,11 @@
 import type { LogMessage } from './types';
 
-let ws: WebSocket | null = null;
-let onMessageCallback: ((msg: LogMessage) => void) | null = null;
-let onStatusCallback: ((connected: boolean) => void) | null = null;
+interface LogConnection {
+  socket: WebSocket;
+  onStatus?: (connected: boolean) => void;
+}
+
+let connection: LogConnection | null = null;
 
 export function connectLogs(
   stackId: string,
@@ -12,27 +15,28 @@ export function connectLogs(
 ): void {
   disconnectLogs();
 
-  onMessageCallback = onMessage || null;
-  onStatusCallback = onStatus || null;
-
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
   let url = `${protocol}//${location.host}/api/ws/logs/${encodeURIComponent(stackId)}`;
   if (serviceName) {
     url += `/${encodeURIComponent(serviceName)}`;
   }
 
-  ws = new WebSocket(url);
+  const current: LogConnection = { socket: new WebSocket(url), onStatus };
+  const socket = current.socket;
+  connection = current;
 
-  ws.onopen = () => {
-    onStatusCallback?.(true);
+  socket.onopen = () => {
+    if (connection !== current) return;
+    onStatus?.(true);
   };
 
-  ws.onmessage = (event) => {
+  socket.onmessage = (event) => {
+    if (connection !== current) return;
     try {
       const msg: LogMessage = JSON.parse(event.data);
-      onMessageCallback?.(msg);
+      onMessage?.(msg);
     } catch {
-      onMessageCallback?.({
+      onMessage?.({
         type: 'log',
         timestamp: new Date().toISOString(),
         content: event.data,
@@ -40,25 +44,34 @@ export function connectLogs(
     }
   };
 
-  ws.onerror = () => {
-    onStatusCallback?.(false);
+  socket.onerror = () => {
+    if (connection !== current) return;
+    onStatus?.(false);
   };
 
-  ws.onclose = () => {
-    onStatusCallback?.(false);
-    ws = null;
+  socket.onclose = () => {
+    if (connection !== current) return;
+    connection = null;
+    onStatus?.(false);
   };
+
+  onStatus?.(false);
 }
 
 export function disconnectLogs(): void {
-  if (ws) {
-    ws.close();
-    ws = null;
-  }
-  onMessageCallback = null;
-  onStatusCallback = null;
+  const current = connection;
+  connection = null;
+  if (!current) return;
+
+  // Detach the old callbacks before close, which completes asynchronously.
+  current.socket.onopen = null;
+  current.socket.onmessage = null;
+  current.socket.onerror = null;
+  current.socket.onclose = null;
+  current.socket.close();
+  current.onStatus?.(false);
 }
 
 export function isConnected(): boolean {
-  return ws !== null && ws.readyState === WebSocket.OPEN;
+  return connection !== null && connection.socket.readyState === WebSocket.OPEN;
 }
