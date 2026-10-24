@@ -379,13 +379,28 @@ func mergeEnv(base map[string]string, override map[string]string) map[string]str
 }
 
 func ensureUniqueServiceNames(services []ServiceSpec) {
+	// Reserve every original name before assigning suffixes, so a duplicate
+	// cannot take a name that belongs to a later service (for example web-2).
+	reserved := make(map[string]bool, len(services))
+	for _, service := range services {
+		reserved[service.Name] = true
+	}
+
 	seen := map[string]int{}
 	for i := range services {
 		name := services[i].Name
 		count := seen[name] + 1
-		seen[name] = count
 		if count > 1 {
-			services[i].Name = fmt.Sprintf("%s-%d", name, count)
+			for {
+				candidate := fmt.Sprintf("%s-%d", name, count)
+				if !reserved[candidate] {
+					services[i].Name = candidate
+					reserved[candidate] = true
+					break
+				}
+				count++
+			}
 		}
+		seen[name] = count
 	}
 }
