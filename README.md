@@ -124,6 +124,27 @@ previous log connection before opening the new one.
 
 Create `devrouter.yaml` in your repository root to customize behavior. Use `devrouter init` to auto-generate from existing `docker-compose.yaml` and `package.json`.
 
+### Automatically discovered service names
+
+Services discovered from workspaces use the workspace directory name, or an
+`overrides.<workspace>.name` value, normalized to lowercase letters, digits, and
+hyphens. The first occurrence of each normalized name keeps that name. Later
+duplicates receive the first available numeric suffix starting at `-2`, skipping
+all original names and names already assigned. Workspaces are processed in sorted
+path order, so unchanged inputs produce the same names.
+
+For example, `apps/web`, `packages/web`, and `services/web-2` become `web`,
+`web-3`, and `web-2`. This keeps all three generated Compose definitions and their
+default hostnames distinct. These names are also used when `devrouter init`
+matches workspaces to Compose services. Services loaded directly from an external
+Compose file keep the service keys in that file.
+
+Projects affected by a suffix collision may see a corrected service name and
+default URL on their next `devrouter up`. Check scripts and bookmarks referring
+to those names. Existing explicit host overrides are preserved; this naming rule
+does not validate custom hosts. Projects without such a collision keep their
+existing names.
+
 ### Basic Configuration
 
 ```yaml
