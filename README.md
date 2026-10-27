@@ -120,6 +120,23 @@ LF/CRLF line endings. An oversized line reports an error and closes the stream
 instead of silently stopping delivery. Selecting another stack closes the
 previous log connection before opening the new one.
 
+### Diagnostic snapshots
+
+The Snapshot panel masks environment values by default. The same values can
+also appear in the Compose file and dependency graph, so a masked export replaces
+each nonempty environment value, the entire configuration content, and every
+nonempty dependency URL/value with `******`. Dependency relationships, service
+metadata, paths, health, resource statistics, and watch status remain available.
+Empty or unavailable values stay empty; an unavailable environment response does
+not disable masking of the other fields.
+
+Select **Include raw env, config and dependency values** to include the original
+API responses and configuration content. Values already redacted by the API
+remain redacted in the environment list. The preview, Copy JSON, and Download
+actions all use the selected export mode. Masked snapshots are not fully
+anonymous: paths, service URLs, and other diagnostic metadata remain, so review
+the export before sharing it.
+
 ## Configuration
 
 Create `devrouter.yaml` in your repository root to customize behavior. Use `devrouter init` to auto-generate from existing `docker-compose.yaml` and `package.json`.
