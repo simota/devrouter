@@ -106,6 +106,7 @@
         {#each rangeOptions as range (range)}
           <button
             class:active={selectedRange === range}
+            aria-pressed={selectedRange === range}
             on:click={() => selectRange(range)}
           >
             {range}
@@ -121,10 +122,10 @@
   </div>
 
   <div class="metric-tabs">
-    <button class:active={selectedMetric === 'cpu'} on:click={() => selectedMetric = 'cpu'}>
+    <button class:active={selectedMetric === 'cpu'} aria-pressed={selectedMetric === 'cpu'} on:click={() => selectedMetric = 'cpu'}>
       CPU
     </button>
-    <button class:active={selectedMetric === 'mem'} on:click={() => selectedMetric = 'mem'}>
+    <button class:active={selectedMetric === 'mem'} aria-pressed={selectedMetric === 'mem'} on:click={() => selectedMetric = 'mem'}>
       Memory
     </button>
   </div>

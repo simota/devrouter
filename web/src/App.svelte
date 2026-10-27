@@ -5,7 +5,7 @@
   import StackCard from './components/StackCard.svelte';
   import LogViewer from './components/LogViewer.svelte';
   import WatchRestartPrototype from './prototypes/WatchRestartPrototype.svelte';
-  import { stacks, selectedStack, fetchStacks, selectStack, clearSelection } from './stores/stacks';
+  import { stacks, selectedStack, selectedStackId, stacksLoaded, stacksError, stackLoading, stackError, fetchStacks, selectStack, clearSelection } from './stores/stacks';
   import { logEntries, clearLogs, appendLog, setLogConnected, logConnected } from './stores/logs';
   import { connectLogs, disconnectLogs } from './api/websocket';
   import type { LogMessage } from './api/types';
@@ -29,7 +29,12 @@
   function handleStackSelect(event: CustomEvent<string>) {
     const stackId = event.detail;
     selectStack(stackId);
+    streamLogs(stackId);
+    logPanelExpanded = true;
+  }
 
+  // The server replays the recent log tail on every connection, so clear first to avoid duplicates.
+  function streamLogs(stackId: string) {
     disconnectLogs();
     clearLogs();
 
@@ -39,8 +44,10 @@
       (msg: LogMessage) => appendLog(msg),
       (connected: boolean) => setLogConnected(connected)
     );
+  }
 
-    logPanelExpanded = true;
+  function handleLogsReconnect() {
+    if ($selectedStackId) streamLogs($selectedStackId);
   }
 
   function handleLogsToggle() {
@@ -64,15 +71,28 @@
       <Sidebar
         stacks={$stacks}
         selectedStackId={$selectedStack?.id || null}
+        loaded={$stacksLoaded}
+        error={$stacksError}
         on:select={handleStackSelect}
+        on:retry={fetchStacks}
       />
 
       <main class="content">
-        {#if $selectedStack}
+        {#if $stackError && $selectedStackId}
+          <div class="empty-state" role="alert">
+            <h2>Couldn't load this stack</h2>
+            <p>{$stackError}</p>
+            <button class="retry-btn" on:click={() => $selectedStackId && selectStack($selectedStackId)}>Retry</button>
+          </div>
+        {:else if $selectedStack}
           <StackCard
             stack={$selectedStack}
             on:close={handleClearSelection}
           />
+        {:else if $stackLoading}
+          <div class="empty-state" role="status">
+            <p>Loading stack…</p>
+          </div>
         {:else}
           <div class="empty-state">
             <div class="empty-icon">
@@ -91,7 +111,9 @@
       logs={$logEntries}
       expanded={logPanelExpanded}
       connected={$logConnected}
+      canReconnect={$selectedStackId !== null}
       on:toggle={handleLogsToggle}
+      on:reconnect={handleLogsReconnect}
       on:clear={() => clearLogs()}
     />
   {/if}
@@ -132,7 +154,7 @@
 
     --text-primary: #e6edf3;
     --text-secondary: #8b949e;
-    --text-tertiary: #6e7681;
+    --text-tertiary: #848d97;
 
     --accent-cyan: #00e5ff;
     --accent-green: #39d353;
@@ -210,6 +232,32 @@
     font-size: 0.875rem;
     max-width: 280px;
     line-height: 1.5;
+  }
+
+  .retry-btn {
+    margin-top: 16px;
+    padding: 8px 16px;
+    font-family: inherit;
+    font-size: 0.813rem;
+    color: var(--text-primary);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .retry-btn:hover {
+    background: var(--bg-hover);
+  }
+
+  @media (max-width: 767px) {
+    .main-layout {
+      flex-direction: column;
+    }
+
+    .content {
+      padding: 16px;
+    }
   }
 
   @keyframes fadeIn {

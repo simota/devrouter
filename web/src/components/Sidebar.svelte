@@ -4,8 +4,10 @@
 
   export let stacks: StackSummary[] = [];
   export let selectedStackId: string | null = null;
+  export let loaded = false;
+  export let error: string | null = null;
 
-  const dispatch = createEventDispatcher<{ select: string }>();
+  const dispatch = createEventDispatcher<{ select: string; retry: void }>();
 
   // Calculate which item should be focusable (roving tabindex)
   $: selectedIndex = stacks.findIndex(s => s.id === selectedStackId);
@@ -65,8 +67,19 @@
     <span class="count">{stacks.length}</span>
   </div>
 
-  <div class="stack-list" on:keydown={handleListKeydown} role="listbox" tabindex="-1">
-    {#if stacks.length === 0}
+  {#if error}
+    <div class="load-error" role="alert">
+      <span>Can't reach the DevRouter server: {error}</span>
+      <button class="retry-btn" on:click={() => dispatch('retry')}>Retry</button>
+    </div>
+  {/if}
+
+  <div class="stack-list" on:keydown={handleListKeydown} role="listbox" tabindex="-1" aria-label="Stacks" aria-busy={!loaded && !error}>
+    {#if !loaded}
+      <div class="empty" role="status">
+        <span>{error ? 'Stacks could not be loaded' : 'Loading stacks…'}</span>
+      </div>
+    {:else if stacks.length === 0}
       <div class="empty" role="status">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -283,5 +296,53 @@
     border: 1px solid var(--border-default);
     border-radius: 3px;
     box-shadow: 0 1px 0 var(--border-default);
+  }
+
+  .load-error {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 12px 12px 0;
+    padding: 10px 12px;
+    font-size: 0.75rem;
+    color: var(--accent-red);
+    background: rgba(248, 81, 73, 0.1);
+    border: 1px solid rgba(248, 81, 73, 0.3);
+    border-radius: 6px;
+  }
+
+  .retry-btn {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    font-family: inherit;
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .retry-btn:hover {
+    background: var(--bg-hover);
+  }
+
+  /* Below the tablet breakpoint the sidebar stacks above the content instead of beside it. */
+  @media (max-width: 767px) {
+    .sidebar {
+      width: 100%;
+      max-height: 35vh;
+      border-right: none;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .sidebar-header {
+      padding: 12px 16px;
+    }
+
+    .sidebar-footer {
+      display: none;
+    }
   }
 </style>

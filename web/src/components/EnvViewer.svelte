@@ -88,10 +88,10 @@
     </div>
     <div class="header-actions">
       <div class="env-tabs">
-        <button class:active={activeTab === 'list'} on:click={() => (activeTab = 'list')}>
+        <button class:active={activeTab === 'list'} aria-pressed={activeTab === 'list'} on:click={() => (activeTab = 'list')}>
           List
         </button>
-        <button class:active={activeTab === 'consistency'} on:click={() => (activeTab = 'consistency')}>
+        <button class:active={activeTab === 'consistency'} aria-pressed={activeTab === 'consistency'} on:click={() => (activeTab = 'consistency')}>
           Consistency
         </button>
       </div>

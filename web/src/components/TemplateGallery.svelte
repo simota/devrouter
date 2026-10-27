@@ -110,6 +110,7 @@
       <button
         class="category-btn"
         class:active={selectedCategory === ''}
+        aria-pressed={selectedCategory === ''}
         on:click={() => selectedCategory = ''}
       >
         All
@@ -118,6 +119,7 @@
         <button
           class="category-btn"
           class:active={selectedCategory === category}
+          aria-pressed={selectedCategory === category}
           on:click={() => selectedCategory = selectedCategory === category ? '' : category}
           style="--category-color: {getCategoryColor(category)}"
         >
