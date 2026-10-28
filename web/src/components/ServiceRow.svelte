@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { createEventDispatcher, onMount, tick } from 'svelte';
   import type { ServiceResponse, ServiceHealthStatus } from '../api/types';
 
   export let service: ServiceResponse;
   export let health: ServiceHealthStatus | null = null;
+  export let healthUnavailable = false;
 
   const dispatch = createEventDispatcher<{ restart: string; buildRestart: string }>();
 
@@ -12,6 +13,8 @@
   let building = false;
   let menuOpen = false;
   let dropdownEl: HTMLDivElement | null = null;
+  let triggerEl: HTMLButtonElement | null = null;
+  let firstItemEl: HTMLButtonElement | null = null;
 
   function openService() {
     window.open(service.url, '_blank', 'noopener,noreferrer');
@@ -39,9 +42,13 @@
     setTimeout(() => { building = false; }, 10000);
   }
 
-  function toggleMenu() {
+  async function toggleMenu() {
     if (restarting || building) return;
     menuOpen = !menuOpen;
+    if (menuOpen) {
+      await tick();
+      firstItemEl?.focus();
+    }
   }
 
   function handleDocumentClick(event: MouseEvent) {
@@ -56,6 +63,7 @@
     if (!menuOpen) return;
     if (event.key === 'Escape') {
       menuOpen = false;
+      triggerEl?.focus();
     }
   }
 
@@ -119,6 +127,8 @@
           <span class="latency">{health.latency}ms</span>
         {/if}
       {/if}
+    {:else if healthUnavailable}
+      <span class="health-badge unknown">unavailable</span>
     {:else}
       <span class="health-badge unknown">checking...</span>
     {/if}
@@ -156,15 +166,17 @@
     <span class="port-value">{service.port}</span>
   </div>
 
-  <div class="restart-dropdown" role="menu" tabindex="-1" bind:this={dropdownEl}>
+  <!-- Disclosure pattern: the trigger exposes aria-expanded and controls a group of plain buttons. -->
+  <div class="restart-dropdown" bind:this={dropdownEl}>
     <button
       class="restart-btn"
+      bind:this={triggerEl}
       on:click={toggleMenu}
       disabled={restarting || building}
       title="Restart options"
       aria-label="Restart options for {service.name}"
       aria-expanded={menuOpen}
-      aria-haspopup="true"
+      aria-controls="restart-options-{service.composeService}"
     >
       {#if restarting || building}
         <svg class="spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -178,8 +190,8 @@
       {/if}
     </button>
     {#if menuOpen}
-      <div class="restart-menu">
-        <button class="menu-item" on:click={handleRestart}>
+      <div class="restart-menu" id="restart-options-{service.composeService}">
+        <button class="menu-item" bind:this={firstItemEl} on:click={handleRestart}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M23 4v6h-6"/>
             <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
@@ -210,8 +222,9 @@
 <style>
   .service-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 14px;
+    gap: 10px 14px;
     padding: 14px 16px;
     background: var(--bg-elevated);
     border: 1px solid var(--border-subtle);
@@ -376,7 +389,7 @@
   }
 
   .service-url {
-    flex: 1;
+    flex: 1 1 180px;
     min-width: 0;
     display: flex;
     align-items: center;

@@ -43,6 +43,9 @@
   let showInsights = false;
   let selectedTemplate: ServiceTemplate | null = null;
   let lastHealthCheck: Date | null = null;
+  let healthFailed = false;
+  let actionError: string | null = null;
+  let retryAction: (() => Promise<void>) | null = null;
   let pathCopyFeedback = false;
   let templateCopyFeedback = false;
 
@@ -90,8 +93,10 @@
       healthVersion++; // Trigger reactivity
       lastHealthCheck = new Date();
       isFirstHealthCheck = false;
+      healthFailed = false;
     } catch (e) {
       console.error('Failed to fetch health:', e);
+      healthFailed = true;
     }
   }
 
@@ -119,14 +124,46 @@
     }
   });
 
+  // Shows a failed action next to the action bar and remembers it so the user can retry.
+  function reportActionError(message: string, e: unknown, retry: () => Promise<void>) {
+    console.error(message, e);
+    const detail = e instanceof Error ? e.message : String(e);
+    actionError = `${message} (${detail})`;
+    retryAction = retry;
+  }
+
+  function dismissActionError() {
+    actionError = null;
+    retryAction = null;
+  }
+
+  function retryFailedAction() {
+    const retry = retryAction;
+    dismissActionError();
+    retry?.();
+  }
+
+  function confirmStop(): boolean {
+    const count = stack.services.length;
+    return window.confirm(
+      `Stop stack "${stack.name}"? All ${count} service${count !== 1 ? 's' : ''} will be stopped. ` +
+      'To start it again, run `devrouter up` in the repository.'
+    );
+  }
+
   async function handleStop() {
-    if (stopping) return;
+    if (stopping || !confirmStop()) return;
+    await stop();
+  }
+
+  async function stop() {
     stopping = true;
+    dismissActionError();
     try {
       await stopStack(stack.id);
       dispatch('close');
     } catch (e) {
-      console.error('Failed to stop stack:', e);
+      reportActionError('Failed to stop the stack', e, stop);
     } finally {
       stopping = false;
     }
@@ -135,12 +172,13 @@
   async function handleRestart() {
     if (restarting) return;
     restarting = true;
+    dismissActionError();
     try {
       await restartStack(stack.id);
       // Refresh health after restart
       scheduleHealthRefresh();
     } catch (e) {
-      console.error('Failed to restart stack:', e);
+      reportActionError('Failed to restart the stack', e, handleRestart);
     } finally {
       restarting = false;
     }
@@ -152,25 +190,33 @@
     return healthMap.get(serviceName) || null;
   }
 
-  async function handleServiceRestart(event: CustomEvent<string>) {
-    const serviceName = event.detail;
+  function handleServiceRestart(event: CustomEvent<string>) {
+    return restartOneService(event.detail);
+  }
+
+  function handleServiceBuildRestart(event: CustomEvent<string>) {
+    return buildRestartOneService(event.detail);
+  }
+
+  async function restartOneService(serviceName: string) {
+    dismissActionError();
     try {
       await restartService(stack.id, serviceName);
       // Refresh health after restart
       scheduleHealthRefresh();
     } catch (e) {
-      console.error('Failed to restart service:', e);
+      reportActionError(`Failed to restart ${serviceName}`, e, () => restartOneService(serviceName));
     }
   }
 
-  async function handleServiceBuildRestart(event: CustomEvent<string>) {
-    const serviceName = event.detail;
+  async function buildRestartOneService(serviceName: string) {
+    dismissActionError();
     try {
       await buildRestartService(stack.id, serviceName);
       // Refresh health after build restart
       scheduleHealthRefresh();
     } catch (e) {
-      console.error('Failed to build and restart service:', e);
+      reportActionError(`Failed to build and restart ${serviceName}`, e, () => buildRestartOneService(serviceName));
     }
   }
 
@@ -308,13 +354,16 @@
           <polyline points="12,6 12,12 16,14"/>
         </svg>
         {formatTime(lastHealthCheck)}
+        {#if healthFailed}
+          <span class="health-failed" role="status">· health check failed, retrying</span>
+        {/if}
       </span>
     </div>
 
     <div class="services-list">
       {#each stack.services as service (service.composeService)}
         {@const health = ((_v) => healthMap.get(service.name) || null)(healthVersion)}
-        <ServiceRow {service} {health} on:restart={handleServiceRestart} on:buildRestart={handleServiceBuildRestart} />
+        <ServiceRow {service} {health} healthUnavailable={healthFailed && !health} on:restart={handleServiceRestart} on:buildRestart={handleServiceBuildRestart} />
       {/each}
     </div>
   </div>
@@ -424,6 +473,18 @@
           : 'Step 1: Copy command and run in terminal'}
       </p>
       <p class="template-desc">Step 2: Click Restart to apply changes.</p>
+    </div>
+  {/if}
+
+  {#if actionError}
+    <div class="action-error" role="alert">
+      <span>{actionError}</span>
+      <div class="action-error-buttons">
+        {#if retryAction}
+          <button class="action-error-btn" on:click={retryFailedAction}>Retry</button>
+        {/if}
+        <button class="action-error-btn" on:click={dismissActionError} aria-label="Dismiss error">Dismiss</button>
+      </div>
     </div>
   {/if}
 
@@ -791,6 +852,45 @@
     font-size: 0.688rem;
     color: var(--text-tertiary);
     font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .health-failed {
+    color: var(--accent-orange);
+  }
+
+  .action-error {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 0 24px 16px;
+    padding: 12px 16px;
+    background: rgba(248, 81, 73, 0.1);
+    border: 1px solid rgba(248, 81, 73, 0.3);
+    border-radius: 8px;
+    color: var(--accent-red);
+    font-size: 0.813rem;
+  }
+
+  .action-error-buttons {
+    display: flex;
+    gap: 8px;
+  }
+
+  .action-error-btn {
+    padding: 6px 12px;
+    font-family: inherit;
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .action-error-btn:hover {
+    background: var(--bg-hover);
   }
 
   .health-updated svg {

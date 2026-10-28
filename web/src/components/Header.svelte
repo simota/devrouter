@@ -191,6 +191,21 @@
     gap: 24px;
   }
 
+  @media (max-width: 479px) {
+    .header {
+      padding: 0 16px;
+    }
+
+    .version,
+    .status-label {
+      display: none;
+    }
+
+    .status {
+      gap: 12px;
+    }
+  }
+
   .status-item {
     display: flex;
     align-items: center;

@@ -6,9 +6,10 @@
   export let logs: LogMessage[] = [];
   export let expanded = false;
   export let connected = false;
+  export let canReconnect = false;
   export let stackName = '';
 
-  const dispatch = createEventDispatcher<{ toggle: void; clear: void }>();
+  const dispatch = createEventDispatcher<{ toggle: void; clear: void; reconnect: void }>();
 
   let logContainer: HTMLElement;
   let logViewer: HTMLElement;
@@ -263,24 +264,30 @@
       <div class="resize-bar"></div>
     </div>
   {/if}
-  <div class="log-header" role="button" tabindex="0" on:click={() => dispatch('toggle')} on:keydown={(e) => e.key === 'Enter' && dispatch('toggle')}>
+  <div class="log-header">
     <div class="header-left">
-      <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="6,9 12,15 18,9"/>
-      </svg>
-      <span class="title">Logs</span>
-      <span class="log-count">{filteredLogs.length}{#if filteredLogs.length !== logs.length}/{logs.length}{/if}</span>
-      <span class="connection-status" class:connected>
+      <button class="header-toggle" aria-expanded={expanded} aria-controls="log-content" on:click={() => dispatch('toggle')}>
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <polyline points="6,9 12,15 18,9"/>
+        </svg>
+        <span class="title">Logs</span>
+        <span class="log-count">{filteredLogs.length}{#if filteredLogs.length !== logs.length}/{logs.length}{/if}</span>
+      </button>
+      <span class="connection-status" class:connected role="status">
         <span class="status-dot"></span>
-        {connected ? 'Connected' : 'Disconnected'}
+        <span class="status-text">{connected ? 'Connected' : 'Disconnected'}</span>
       </span>
+      {#if !connected && canReconnect}
+        <button class="reconnect-btn" on:click={() => dispatch('reconnect')}>Reconnect</button>
+      {/if}
     </div>
     <div class="header-right">
       {#if expanded}
         <button
           class="header-btn"
           class:active={showFilters || searchQuery || selectedService}
-          on:click|stopPropagation={toggleFilters}
+          aria-expanded={showFilters}
+          on:click={toggleFilters}
           title="Toggle filters"
           aria-label="Toggle log filters"
         >
@@ -290,7 +297,7 @@
         </button>
         <button
           class="header-btn"
-          on:click|stopPropagation={() => { autoScroll = true; }}
+          on:click={() => { autoScroll = true; }}
           title="Scroll to bottom"
           aria-label="Scroll logs to bottom"
         >
@@ -301,7 +308,7 @@
         </button>
         <button
           class="header-btn"
-          on:click|stopPropagation={() => exportLogs('json')}
+          on:click={() => exportLogs('json')}
           title="Export as JSON"
           aria-label="Export logs as JSON"
         >
@@ -314,7 +321,7 @@
         </button>
         <button
           class="header-btn"
-          on:click|stopPropagation={() => dispatch('clear')}
+          on:click={() => dispatch('clear')}
           title="Clear logs"
           aria-label="Clear log entries"
         >
@@ -333,6 +340,7 @@
         <button
           class="stat-badge"
           class:active={selectedLevel === ''}
+          aria-pressed={selectedLevel === ''}
           on:click={() => selectedLevel = ''}
         >
           All <span class="stat-count">{logStats.total}</span>
@@ -340,6 +348,7 @@
         <button
           class="stat-badge errors"
           class:active={selectedLevel === 'error'}
+          aria-pressed={selectedLevel === 'error'}
           on:click={() => selectedLevel = selectedLevel === 'error' ? '' : 'error'}
         >
           Errors <span class="stat-count">{logStats.errors}</span>
@@ -347,6 +356,7 @@
         <button
           class="stat-badge warnings"
           class:active={selectedLevel === 'warn'}
+          aria-pressed={selectedLevel === 'warn'}
           on:click={() => selectedLevel = selectedLevel === 'warn' ? '' : 'warn'}
         >
           Warnings <span class="stat-count">{logStats.warnings}</span>
@@ -380,6 +390,7 @@
 
   {#if expanded}
     <div
+      id="log-content"
       class="log-content"
       bind:this={logContainer}
       on:scroll={handleScroll}
@@ -435,6 +446,37 @@
     transition: none;
   }
 
+  /* On narrow screens the panel must leave room for the stack details above it. */
+  @media (max-width: 767px) {
+    .log-viewer.expanded {
+      max-height: 40vh;
+    }
+  }
+
+  @media (max-width: 479px) {
+    .log-header {
+      padding: 0 12px;
+    }
+
+    .header-left {
+      gap: 6px;
+    }
+
+    .log-count {
+      display: none;
+    }
+
+    /* Keep the dot visible and the state readable by screen readers. */
+    .connection-status .status-text {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+  }
+
   .resize-handle {
     position: absolute;
     top: 0;
@@ -469,20 +511,47 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    cursor: pointer;
     user-select: none;
     border-bottom: 1px solid var(--border-subtle);
     flex-shrink: 0;
-  }
-
-  .log-header:hover {
-    background: var(--bg-hover);
   }
 
   .header-left {
     display: flex;
     align-items: center;
     gap: 10px;
+  }
+
+  .header-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    margin-left: -8px;
+    font-family: inherit;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .header-toggle:hover {
+    background: var(--bg-hover);
+  }
+
+  .reconnect-btn {
+    padding: 4px 10px;
+    font-family: inherit;
+    font-size: 0.688rem;
+    color: var(--accent-cyan);
+    background: rgba(0, 229, 255, 0.1);
+    border: 1px solid rgba(0, 229, 255, 0.3);
+    border-radius: 12px;
+    cursor: pointer;
+  }
+
+  .reconnect-btn:hover {
+    background: rgba(0, 229, 255, 0.2);
   }
 
   .chevron {
