@@ -2,13 +2,9 @@
   import { createEventDispatcher } from 'svelte';
   import type {
     StackResponse,
-    StackHealthResponse,
-    StackStatsResponse,
-    StackDependenciesResponse,
-    EnvResponse,
-    ConfigFileResponse,
     WatchStatus,
   } from '../api/types';
+  import { buildSnapshot, type SnapshotBase } from '../lib/snapshot';
   import {
     getStackHealth,
     getStackStats,
@@ -22,37 +18,6 @@
   const dispatch = createEventDispatcher<{ close: void }>();
   const API_BASE = '/api';
 
-  type SnapshotMeta = {
-    createdAt: string;
-    stackId: string;
-    repoPath: string;
-    domain: string;
-    source: string;
-  };
-
-  type SnapshotBase = {
-    meta: SnapshotMeta;
-    stack: StackResponse;
-    health: StackHealthResponse;
-    stats: StackStatsResponse;
-    dependencies: StackDependenciesResponse;
-    env: EnvResponse;
-    config: ConfigFileResponse;
-    watch: WatchStatus;
-  };
-
-  type StackSnapshot = {
-    meta: SnapshotMeta;
-    envRedacted: boolean;
-    stack: StackResponse;
-    health: StackHealthResponse;
-    stats: StackStatsResponse;
-    dependencies: StackDependenciesResponse;
-    env: EnvResponse;
-    config: ConfigFileResponse;
-    watch: WatchStatus;
-  };
-
   let includeRawEnv = false;
   let generating = false;
   let error: string | null = null;
@@ -65,30 +30,6 @@
     const res = await fetch(`${API_BASE}/stacks/${encodeURIComponent(stackId)}/watch`);
     if (!res.ok) throw new Error('Failed to fetch watch status');
     return res.json();
-  }
-
-  function redactEnv(env: EnvResponse): EnvResponse {
-    return {
-      ...env,
-      env: env.env.map((item) => ({
-        ...item,
-        value: item.value ? '******' : '',
-      })),
-    };
-  }
-
-  function buildSnapshot(base: SnapshotBase, envRedacted: boolean): StackSnapshot {
-    return {
-      meta: base.meta,
-      envRedacted,
-      stack: base.stack,
-      health: base.health,
-      stats: base.stats,
-      dependencies: base.dependencies,
-      env: envRedacted ? redactEnv(base.env) : base.env,
-      config: base.config,
-      watch: base.watch,
-    };
   }
 
   function formatTime(date: Date | null): string {
@@ -274,11 +215,13 @@
 
   <div class="snapshot-controls">
     <label class="snapshot-toggle">
-      <input type="checkbox" bind:checked={includeRawEnv} />
-      <span>Include raw env values</span>
+      <input type="checkbox" bind:checked={includeRawEnv} aria-describedby="snapshot-export-hint" />
+      <span>Include raw env, config and dependency values</span>
     </label>
-    <span class="toggle-hint">
-      {includeRawEnv ? 'Raw values will be included in the export' : 'Env values are masked by default'}
+    <span class="toggle-hint" id="snapshot-export-hint">
+      {includeRawEnv
+        ? 'Raw API values and full config will be exported; review before sharing.'
+        : 'Env values, config content and dependency values are masked. Paths and service metadata remain.'}
     </span>
   </div>
 
@@ -451,6 +394,7 @@
 
   .snapshot-controls {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
@@ -461,6 +405,7 @@
 
   .snapshot-toggle {
     display: inline-flex;
+    flex: 0 1 auto;
     align-items: center;
     gap: 8px;
     font-size: 0.688rem;
@@ -474,6 +419,7 @@
   }
 
   .toggle-hint {
+    flex: 1 1 240px;
     font-size: 0.688rem;
     color: var(--text-tertiary);
   }
