@@ -233,7 +233,8 @@ func resolveComposeForDoctor(repoPath string, cfg Config, opts DoctorOptions) (s
 }
 
 func TraefikRunning() (bool, error) {
-	output, err := DockerOutput("ps", "--filter", "ancestor=traefik", "--format", "{{.Names}}")
+	// ancestor needs the tag: a bare "traefik" only matches traefik:latest, never the image the daemon runs.
+	output, err := DockerOutput("ps", "--filter", "ancestor="+traefikImage, "--format", "{{.Names}}")
 	if err != nil {
 		return false, err
 	}
