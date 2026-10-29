@@ -139,14 +139,19 @@ func RemoveStack(reg Registry, stackID string) (Registry, bool) {
 func StackRecordFromSpec(stack StackSpec, composePath string, source string, scheme string) StackRecord {
 	services := make([]ServiceRecord, 0, len(stack.Services))
 	for _, svc := range stack.Services {
+		url := ""
+		if svc.Host != "" {
+			url = fmt.Sprintf("%s://%s", scheme, svc.Host)
+		}
 		services = append(services, ServiceRecord{
 			Name:           svc.Name,
 			WorkspacePath:  svc.WorkspacePath,
 			Host:           svc.Host,
-			URL:            fmt.Sprintf("%s://%s", scheme, svc.Host),
+			URL:            url,
 			Port:           svc.Port,
 			ComposeService: svc.ComposeService,
 			HealthCheck:    svc.HealthCheck,
+			Kind:           svc.Kind,
 		})
 	}
 	return StackRecord{

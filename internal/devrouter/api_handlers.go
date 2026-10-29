@@ -92,6 +92,7 @@ func (s *Server) handleGetStack(w http.ResponseWriter, r *http.Request) {
 			Port:           svc.Port,
 			ComposeService: svc.ComposeService,
 			HealthCheck:    svc.HealthCheck,
+			Kind:           svc.Kind,
 		})
 	}
 
@@ -154,6 +155,7 @@ func (s *Server) handleGetService(w http.ResponseWriter, r *http.Request) {
 		Port:           svc.Port,
 		ComposeService: svc.ComposeService,
 		HealthCheck:    svc.HealthCheck,
+		Kind:           svc.Kind,
 	})
 }
 
@@ -178,6 +180,11 @@ func (s *Server) handleGetServiceURL(w http.ResponseWriter, r *http.Request) {
 	svc, ok := FindService(stack, serviceName)
 	if !ok {
 		s.writeError(w, http.StatusNotFound, "SERVICE_NOT_FOUND", "service not found: "+serviceName)
+		return
+	}
+
+	if svc.URL == "" {
+		s.writeError(w, http.StatusNotFound, "SERVICE_HAS_NO_URL", "service has no URL: "+serviceName)
 		return
 	}
 
@@ -218,6 +225,7 @@ func (s *Server) handleStackHealth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get container states
+	// #TODO(agent): OUT-OF-SCOPE ComposePs omits stopped containers (no `ps -a`), so a stopped service reports not_found instead of exited.
 	containerStates, _ := ComposePs(stack.ComposeFilePath)
 	if containerStates == nil {
 		containerStates = make(map[string]string)
@@ -271,6 +279,12 @@ func checkServiceHealth(svc ServiceRecord, containerStates map[string]string) Se
 
 	// Skip HTTP health check if container is not running
 	if containerState != "running" {
+		return status
+	}
+
+	// A worker has no URL; a running container is all the health it has.
+	if svc.Kind == ServiceKindWorker {
+		status.Status = "healthy"
 		return status
 	}
 

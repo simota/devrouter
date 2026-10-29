@@ -54,6 +54,33 @@ func LoadStackFromCompose(repoPath string, cfg Config, composePath string) (Stac
 		if !isDevrouterEnabled(labels) {
 			continue
 		}
+
+		// Apply overrides from config
+		var healthCheck HealthCheckConfig
+		if override, ok := cfg.Overrides[name]; ok {
+			healthCheck = override.HealthCheck
+		}
+
+		kind, hasKind := devrouterKind(labels)
+		if hasKind && kind != ServiceKindWorker {
+			warnings = append(warnings, fmt.Sprintf("service %s: unknown devrouter.kind %q, treating as http", name, kind))
+		}
+		if kind == ServiceKindWorker {
+			// Workers have no URL, so the Traefik and devrouter_net checks below do not apply.
+			if parseTraefikHost(labels) != "" {
+				warnings = append(warnings, fmt.Sprintf("service %s: devrouter.kind=worker but has a traefik router rule", name))
+			}
+			services = append(services, ServiceSpec{
+				Name:           name,
+				WorkspacePath:  name,
+				Env:            map[string]string{},
+				ComposeService: name,
+				HealthCheck:    healthCheck,
+				Kind:           ServiceKindWorker,
+			})
+			continue
+		}
+
 		if !serviceHasNetwork(svc.Networks, DevrouterNetwork) {
 			warnings = append(warnings, fmt.Sprintf("service %s: not connected to %s", name, DevrouterNetwork))
 		}
@@ -73,12 +100,6 @@ func LoadStackFromCompose(repoPath string, cfg Config, composePath string) (Stac
 		}
 		if !isTraefikEnabled(labels) {
 			warnings = append(warnings, fmt.Sprintf("service %s: traefik.enable is not true", name))
-		}
-
-		// Apply overrides from config
-		var healthCheck HealthCheckConfig
-		if override, ok := cfg.Overrides[name]; ok {
-			healthCheck = override.HealthCheck
 		}
 
 		services = append(services, ServiceSpec{
@@ -204,6 +225,17 @@ func isDevrouterEnabled(labels map[string]string) bool {
 		return false
 	}
 	return isTruthy(value)
+}
+
+func devrouterKind(labels map[string]string) (string, bool) {
+	if len(labels) == 0 {
+		return "", false
+	}
+	value, ok := labels["devrouter.kind"]
+	if !ok {
+		return "", false
+	}
+	return strings.ToLower(strings.TrimSpace(value)), true
 }
 
 func isTraefikEnabled(labels map[string]string) bool {

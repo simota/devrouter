@@ -153,7 +153,7 @@ func runUp(args []string) int {
 	}
 	fmt.Printf("stack: %s (%s)\n", record.Name, record.ID)
 	for _, svc := range record.Services {
-		fmt.Printf("- %s: %s (%s)\n", svc.Name, svc.URL, svc.WorkspacePath)
+		fmt.Printf("- %s: %s (%s)\n", svc.Name, displayURL(svc.URL), svc.WorkspacePath)
 	}
 	return 0
 }
@@ -194,10 +194,17 @@ func runLs() int {
 			source = "unknown"
 		}
 		for _, svc := range stack.Services {
-			fmt.Printf("%s\t%s\t%s\t%s\t%s\n", stack.Name, svc.Name, source, svc.URL, svc.WorkspacePath)
+			fmt.Printf("%s\t%s\t%s\t%s\t%s\n", stack.Name, svc.Name, source, displayURL(svc.URL), svc.WorkspacePath)
 		}
 	}
 	return 0
+}
+
+func displayURL(url string) string {
+	if url == "" {
+		return "-"
+	}
+	return url
 }
 
 func runLogs(args []string) int {
