@@ -8,6 +8,8 @@ type StackSpec struct {
 	Services []ServiceSpec
 }
 
+const ServiceKindWorker = "worker"
+
 type ServiceSpec struct {
 	Name           string
 	WorkspacePath  string
@@ -18,6 +20,9 @@ type ServiceSpec struct {
 	Host           string
 	ComposeService string
 	HealthCheck    HealthCheckConfig
+	// Kind is "" for an HTTP service routed by Traefik, or ServiceKindWorker
+	// for a long-running process that has no URL.
+	Kind string
 	// ExtraPorts defines additional HTTP ports exposed via Traefik with host suffix.
 	// Example: [{Port: 9001, Suffix: "console"}] -> stack-service-console.domain:443 -> :9001
 	ExtraPorts []HTTPPort
@@ -99,6 +104,7 @@ type ServiceRecord struct {
 	Port           int               `json:"port"`
 	ComposeService string            `json:"composeService"`
 	HealthCheck    HealthCheckConfig `json:"healthCheck,omitempty"`
+	Kind           string            `json:"kind,omitempty"`
 }
 
 type ExecOptions struct {

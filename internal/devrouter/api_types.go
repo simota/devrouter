@@ -50,6 +50,7 @@ type ServiceResponse struct {
 	Port           int               `json:"port"`
 	ComposeService string            `json:"composeService"`
 	HealthCheck    HealthCheckConfig `json:"healthCheck,omitempty"`
+	Kind           string            `json:"kind,omitempty"`
 }
 
 // HealthResponse represents the health check response

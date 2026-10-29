@@ -38,6 +38,7 @@ export interface ServiceResponse {
   port: number;
   composeService: string;
   healthCheck?: HealthCheckConfig;
+  kind?: 'worker';
 }
 
 export interface HealthResponse {

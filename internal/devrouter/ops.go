@@ -206,6 +206,9 @@ func Open(target string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("service not found: %s", serviceName)
 	}
+	if service.Kind == ServiceKindWorker {
+		return "", fmt.Errorf("service %s is a worker and has no URL", serviceName)
+	}
 	return service.URL, nil
 }
 

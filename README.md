@@ -215,6 +215,22 @@ services:
       - devrouter_net
 ```
 
+A long-running process without an HTTP URL (a scheduled job worker, a queue
+consumer) can be added with `devrouter.kind=worker`. Workers need no Traefik
+labels and no `devrouter_net`; they appear in `devrouter ls` with `-` as the URL,
+work with `devrouter logs` and `devrouter exec`, and are reported `healthy`
+while their container is running. `devrouter open` refuses them.
+
+```yaml
+services:
+  worker:
+    labels:
+      - devrouter.enabled=true
+      - devrouter.kind=worker
+```
+
+Any other `devrouter.kind` value is warned about and treated as an HTTP service.
+
 ### File Watching
 
 Auto-restart services on file changes:
@@ -315,6 +331,7 @@ rename. Atomic replacement does not provide a power-loss durability guarantee.
 | Host not reachable | Ensure `HOST=0.0.0.0` in your app config |
 | Wrong port detected | Explicitly set ports in `devrouter.yaml` |
 | External compose not working | Add `devrouter.enabled=true`, Traefik labels, and `devrouter_net` |
+| Worker without a URL warns about Traefik or gets a placeholder URL | Add `devrouter.kind=worker`; Traefik labels and `devrouter_net` are not needed |
 | HMR not working | Check WebSocket proxy and host restrictions |
 
 Use `devrouter doctor` to diagnose common configuration issues.
